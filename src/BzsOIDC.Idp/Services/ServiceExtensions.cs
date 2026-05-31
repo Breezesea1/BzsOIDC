@@ -34,6 +34,7 @@ internal static class ServiceExtensions
     internal static IServiceCollection AddIdpService(this IServiceCollection sc, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
         sc.AddForwardedHeaders();
+        sc.AddAntiforgery();
         sc.AddMemoryCache();
         sc.AddBzsCache(configuration);
 

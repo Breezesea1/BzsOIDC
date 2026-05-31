@@ -13,6 +13,7 @@
   <data name="HeroLead" xml:space="preserve"><value>管理登录账号。</value></data>
   <data name="FilterByRole" xml:space="preserve"><value>按角色筛选</value></data>
   <data name="Refresh" xml:space="preserve"><value>刷新</value></data>
+  <data name="SelectedRows" xml:space="preserve"><value>已选择 {0} 个用户</value></data>
   <data name="NewUser" xml:space="preserve"><value>新建用户</value></data>
   <data name="All" xml:space="preserve"><value>全部</value></data>
   <data name="Standard" xml:space="preserve"><value>标准用户</value></data>
@@ -43,6 +44,7 @@
   <data name="Role" xml:space="preserve"><value>角色</value></data>
   <data name="Email" xml:space="preserve"><value>邮箱</value></data>
   <data name="Identifier" xml:space="preserve"><value>标识</value></data>
+  <data name="Select" xml:space="preserve"><value>选择</value></data>
   <data name="Actions" xml:space="preserve"><value>操作</value></data>
   <data name="NoMatchingUsers" xml:space="preserve"><value>没有匹配的用户</value></data>
   <data name="NoMatchingUsersLead" xml:space="preserve"><value>换个关键词，或创建账号。</value></data>

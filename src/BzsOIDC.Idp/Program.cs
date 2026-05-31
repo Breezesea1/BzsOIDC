@@ -1,3 +1,4 @@
+using BootstrapBlazor.Components;
 using BzsOIDC.Idp.Components;
 using BzsOIDC.Idp.Client.Services.Dashboard;
 using BzsOIDC.Idp.Infra;
@@ -33,6 +34,7 @@ builder.Services.AddAdminDashboardClient(serviceProvider =>
     }.Uri;
 });
 builder.Services.AddScoped<IAdminDashboardClient, ServerAdminDashboardClient>();
+builder.Services.AddBootstrapBlazor();
 builder.Services.AddLocalization(options => { options.ResourcesPath = "Resources"; });
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.Configure<RequestLocalizationOptions>(options =>

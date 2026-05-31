@@ -149,7 +149,8 @@
 }
 
 .field input::placeholder {
-    color: var(--input-placeholder);
+    color: color-mix(in srgb, var(--input-placeholder) 52%, transparent);
+    opacity: 1;
 }
 
 .field input:focus {
@@ -163,6 +164,18 @@
 
 .password-wrap input {
     padding-right: 2.5rem;
+}
+
+.password-wrap input::-ms-reveal,
+.password-wrap input::-ms-clear {
+    display: none;
+}
+
+.password-wrap input::-webkit-credentials-auto-fill-button {
+    visibility: hidden;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
 }
 
 .password-toggle {
@@ -397,7 +410,8 @@
 }
 
 :root[data-theme="dark"] .field input::placeholder {
-    color: var(--text-subtle);
+    color: color-mix(in srgb, var(--text-subtle) 56%, transparent);
+    opacity: 1;
 }
 
 :root[data-theme="dark"] .field input:focus {

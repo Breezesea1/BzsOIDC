@@ -38,7 +38,7 @@ public sealed class AccountControllerTests
     public async Task Login_WhenCredentialsValid_LocalRedirectsToSafeReturnUrl()
     {
         var signInManager = CreateSignInManager();
-        signInManager.PasswordSignInAsync("admin", "Passw0rd!", true, true)
+        signInManager.PasswordSignInAsync("admin", "admin123", true, true)
             .Returns(Microsoft.AspNetCore.Identity.SignInResult.Success);
 
         var sut = CreateSut(signInManager, static url => url == "/admin/users");
@@ -46,14 +46,14 @@ public sealed class AccountControllerTests
         var result = await sut.Login(new AccountController.LoginForm
         {
             UserName = "  admin  ",
-            Password = "Passw0rd!",
+            Password = "admin123",
             RememberMe = true,
         }, "/admin/users");
 
         var redirect = Assert.IsType<LocalRedirectResult>(result);
         Assert.Equal("/admin/users", redirect.Url);
         await signInManager.Received(1)
-            .PasswordSignInAsync("admin", "Passw0rd!", true, true);
+            .PasswordSignInAsync("admin", "admin123", true, true);
     }
 
     [Fact]

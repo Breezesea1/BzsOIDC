@@ -27,7 +27,7 @@ public sealed class IdentitySeederTests
             Admin = new SeedAdminOptions
             {
                 UserName = string.Empty,
-                Password = "Passw0rd!",
+                Password = "admin123",
             },
         });
         var configuration = new ConfigurationBuilder().Build();
@@ -69,7 +69,7 @@ public sealed class IdentitySeederTests
 
         userService.GetByNameAsync("admin", Arg.Any<CancellationToken>())
             .Returns(existingAdmin);
-        userService.EnsurePasswordAsync(existingAdmin.Id, "Passw0rd!", Arg.Any<CancellationToken>())
+        userService.EnsurePasswordAsync(existingAdmin.Id, "admin123", Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(IdentityResult.Success));
         userService.IsInRoleAsync(default, default!, default)
             .ReturnsForAnyArgs(Task.FromResult(true));
@@ -79,7 +79,7 @@ public sealed class IdentitySeederTests
             Admin = new SeedAdminOptions
             {
                 UserName = "admin",
-                Password = "Passw0rd!",
+                Password = "admin123",
             },
             InitialRoles = [IdentitySeedConstants.UserRoleName],
             RolePermissions = new Dictionary<string, string[]>
@@ -108,7 +108,7 @@ public sealed class IdentitySeederTests
         await oidcScopeService.Received(1)
             .InitializeDefaultsIfMissingAsync(options.Value.AdditionalScopes, Arg.Any<CancellationToken>());
         await userService.Received(1)
-            .EnsurePasswordAsync(existingAdmin.Id, "Passw0rd!", Arg.Any<CancellationToken>());
+            .EnsurePasswordAsync(existingAdmin.Id, "admin123", Arg.Any<CancellationToken>());
         await userService.DidNotReceive()
             .CreateAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
         await userService.DidNotReceive()
@@ -138,9 +138,9 @@ public sealed class IdentitySeederTests
 
         userService.GetByNameAsync("admin", Arg.Any<CancellationToken>())
             .Returns((BzsUser?)null, createdAdmin);
-        userService.CreateAsync("admin", "Passw0rd!", Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        userService.CreateAsync("admin", "admin123", Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(IdentityResult.Success));
-        userService.EnsurePasswordAsync(createdAdmin.Id, "Passw0rd!", Arg.Any<CancellationToken>())
+        userService.EnsurePasswordAsync(createdAdmin.Id, "admin123", Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(IdentityResult.Success));
         userService.IsInRoleAsync(default, default!, default)
             .ReturnsForAnyArgs(Task.FromResult(false));
@@ -152,7 +152,7 @@ public sealed class IdentitySeederTests
             Admin = new SeedAdminOptions
             {
                 UserName = "admin",
-                Password = "Passw0rd!",
+                Password = "admin123",
             },
             InitialRoles = [IdentitySeedConstants.UserRoleName],
             RolePermissions = new Dictionary<string, string[]>
@@ -177,9 +177,9 @@ public sealed class IdentitySeederTests
         await sut.SeedAsync();
 
         await userService.Received(1)
-            .CreateAsync("admin", "Passw0rd!", Arg.Any<string?>(), Arg.Any<CancellationToken>());
+            .CreateAsync("admin", "admin123", Arg.Any<string?>(), Arg.Any<CancellationToken>());
         await userService.Received(1)
-            .EnsurePasswordAsync(createdAdmin.Id, "Passw0rd!", Arg.Any<CancellationToken>());
+            .EnsurePasswordAsync(createdAdmin.Id, "admin123", Arg.Any<CancellationToken>());
         await userService.Received(1)
             .AddToRoleAsync(createdAdmin.Id, IdentitySeedConstants.AdminRoleName, Arg.Any<CancellationToken>());
     }

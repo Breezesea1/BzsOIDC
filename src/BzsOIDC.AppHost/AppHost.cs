@@ -19,7 +19,7 @@ if (string.IsNullOrWhiteSpace(adminUserName) && builder.Environment.IsDevelopmen
 
 if (string.IsNullOrWhiteSpace(adminPassword) && builder.Environment.IsDevelopment())
 {
-    adminPassword = "Passw0rd!";
+    adminPassword = "admin123";
 }
 
 IResourceBuilder<PostgresServerResource>? postgres = null;

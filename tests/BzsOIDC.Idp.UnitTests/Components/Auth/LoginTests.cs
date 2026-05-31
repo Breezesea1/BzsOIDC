@@ -57,6 +57,26 @@ public sealed class LoginTests
     }
 
     [Fact]
+    public void Login_PasswordInput_UsesCurrentPasswordAutocomplete()
+    {
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddSingleton<AuthenticationStateProvider>(
+            new TestAuthenticationStateProvider(new ClaimsPrincipal(new ClaimsIdentity())));
+        context.Services.AddSingleton<IStringLocalizer<Login>, TestStringLocalizer<Login>>();
+        context.Services.AddSingleton<IStringLocalizer<AuthPreferences>, TestStringLocalizer<AuthPreferences>>();
+        context.Services.AddSingleton<AntiforgeryStateProvider, TestAntiforgeryStateProvider>();
+        context.Services.AddSingleton<IExternalLoginProviderStore>(new EmptyExternalLoginProviderStore());
+
+        var cut = context.Render<CascadingAuthenticationState>(parameters => parameters
+            .AddChildContent<Login>());
+
+        var passwordInput = cut.Find("#password");
+
+        Assert.Equal("current-password", passwordInput.GetAttribute("autocomplete"));
+    }
+
+    [Fact]
     public void Login_WhenPasswordVisibilityToggled_UpdatesPressedStateAndInputType()
     {
         using var context = new BunitContext();

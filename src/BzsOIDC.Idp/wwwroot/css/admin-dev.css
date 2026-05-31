@@ -299,6 +299,40 @@
     font-variant-numeric: tabular-nums;
 }
 
+.admin-users-page-shell {
+    gap: 1rem;
+}
+
+.admin-users-command-bar {
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.45rem 0.35rem 0;
+    margin-top: 0;
+}
+
+.admin-users-filter-tabs {
+    flex: none;
+    margin: 0;
+}
+
+.admin-users-search-stack {
+    flex: 1 1 22rem;
+    min-width: 18rem;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.85rem;
+}
+
+.admin-users-search-field {
+    flex: 1 1 18rem;
+    max-width: 28rem;
+}
+
+.admin-users-command-actions {
+    flex: none;
+    margin-left: auto;
+}
+
 .admin-overview-grid {
     display: grid;
     gap: 1.15rem;
@@ -465,6 +499,21 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
+}
+
+.admin-selection-summary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    padding: 0 0.7rem;
+    border: 1px solid var(--z-border);
+    border-radius: 999px;
+    background: var(--z-surface-subtle);
+    color: var(--z-muted-fg);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    white-space: nowrap;
+    box-shadow: var(--z-shadow-xs);
 }
 
 .admin-toolbar-button svg,
@@ -767,6 +816,237 @@
     border-bottom: none;
 }
 
+.admin-bootstrap-table {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.admin-bootstrap-table .table,
+.admin-bootstrap-table .table-responsive {
+    margin-bottom: 0;
+}
+
+.admin-bootstrap-table .table-responsive,
+.admin-bootstrap-table .table-container,
+.admin-bootstrap-table .table-card,
+.admin-bootstrap-table .table-row,
+.admin-bootstrap-table .table-cell,
+.admin-bootstrap-table .table tbody td {
+    overflow: visible;
+}
+
+.admin-bootstrap-table .table {
+    width: 100% !important;
+    max-width: 100%;
+    color: var(--z-primary);
+    background: transparent;
+}
+
+.admin-bootstrap-table .table thead th {
+    background: var(--z-surface);
+    color: var(--z-muted-fg);
+    border-bottom: 1px solid var(--z-border);
+    white-space: nowrap;
+}
+
+.admin-bootstrap-table .table thead th.sortable:hover,
+.admin-bootstrap-table .table thead th.filterable:hover {
+    background: var(--z-surface);
+}
+
+.admin-bootstrap-table .table thead th .table-cell {
+    gap: 0.35rem;
+}
+
+.admin-bootstrap-table .table thead th.sortable .table-text,
+.admin-bootstrap-table .table thead th.filterable .table-text {
+    padding-right: 0;
+}
+
+.admin-bootstrap-table .table thead th .sort-icon,
+.admin-bootstrap-table .table thead th .filter-icon > i,
+.admin-bootstrap-table .table thead th .toolbox-icon {
+    position: static;
+    width: 1rem;
+    min-width: 1rem;
+    height: 1rem;
+    color: var(--z-muted-fg);
+    background: transparent !important;
+    opacity: 0.45;
+}
+
+.admin-bootstrap-table .table thead th .sort-icon {
+    font-size: 0;
+}
+
+.admin-bootstrap-table .table thead th .sort-icon::before {
+    content: "↕";
+    font-family: var(--z-font-mono);
+    font-size: 0.72rem;
+    line-height: 1;
+}
+
+.admin-bootstrap-table .table thead th .sort-icon:hover,
+.admin-bootstrap-table .table thead th .filter-icon > i:hover,
+.admin-bootstrap-table .table thead th .toolbox-icon:hover,
+.admin-bootstrap-table .table thead th.sortable:hover .sort-icon {
+    color: var(--z-primary);
+    background: transparent !important;
+    opacity: 0.72;
+}
+
+.admin-bootstrap-table .table thead th .col-resizer {
+    background: transparent;
+}
+
+.admin-bootstrap-table .table tbody td {
+    color: var(--z-primary);
+    border-color: var(--z-border);
+    padding-block: 0.8rem;
+    vertical-align: middle;
+}
+
+.admin-bootstrap-table .table tbody td > .table-cell {
+    min-height: 3rem;
+    display: flex;
+    align-items: center;
+}
+
+.admin-bootstrap-table .table tbody td:first-child > .table-cell {
+    justify-content: center;
+}
+
+.admin-bootstrap-table .table tbody tr:hover > * {
+    background: var(--z-row-hover);
+}
+
+.admin-bootstrap-table .table-container,
+.admin-bootstrap-table .table-card {
+    background: transparent;
+    color: var(--z-primary);
+}
+
+.admin-bootstrap-table .table-card {
+    border-radius: inherit;
+}
+
+.admin-bootstrap-table .table-card > .table-row {
+    border-bottom: 1px solid var(--z-border);
+    color: var(--z-primary);
+    min-height: 3.75rem;
+}
+
+.admin-bootstrap-table .table-card > .table-row:hover {
+    background: var(--z-row-hover);
+}
+
+.admin-bootstrap-table .table-card .table-cell label {
+    color: var(--z-muted-fg);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.admin-bootstrap-table .table input[type="checkbox"],
+.admin-bootstrap-table input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--z-primary);
+    cursor: pointer;
+}
+
+.admin-bootstrap-table .btn,
+.admin-bootstrap-table .form-control,
+.admin-bootstrap-table .form-select {
+    border-color: var(--z-border);
+    border-radius: 10px;
+    background-color: var(--z-surface);
+    color: var(--z-primary);
+}
+
+.admin-bootstrap-table .dropdown-menu,
+.admin-bootstrap-table .popover,
+.admin-bootstrap-table .table-column-list {
+    border: 1px solid var(--z-border);
+    border-radius: 12px;
+    background: var(--z-surface);
+    color: var(--z-primary);
+    box-shadow: var(--z-shadow-card);
+}
+
+.admin-bootstrap-table .dropdown-item {
+    color: var(--z-primary);
+}
+
+.admin-bootstrap-table .dropdown-item:hover,
+.admin-bootstrap-table .dropdown-item:focus,
+.admin-bootstrap-table .dropdown-item.active {
+    background: var(--z-surface-muted);
+    color: var(--z-primary);
+}
+
+.admin-bootstrap-table .table-loader {
+    background: color-mix(in srgb, var(--z-surface) 72%, transparent);
+    color: var(--z-primary);
+}
+
+.admin-bootstrap-table .empty,
+.admin-bootstrap-table .table-empty,
+.admin-bootstrap-table .no-data {
+    color: var(--z-muted-fg);
+}
+
+.admin-bootstrap-table .pagination {
+    gap: 0.35rem;
+}
+
+.admin-bootstrap-table .page-link {
+    border-color: var(--z-border);
+    background: var(--z-surface);
+    color: var(--z-primary);
+}
+
+.admin-bootstrap-table .page-link:hover {
+    background: var(--z-surface-muted);
+    color: var(--z-primary);
+}
+
+.admin-bootstrap-table .page-item.active .page-link {
+    background: var(--z-primary);
+    border-color: var(--z-primary);
+    color: var(--z-button-primary-fg);
+}
+
+:root[data-theme="dark"] .admin-bootstrap-table .table-container,
+:root[data-theme="dark"] .admin-bootstrap-table .table-card,
+:root[data-theme="dark"] .admin-bootstrap-table .dropdown-menu,
+:root[data-theme="dark"] .admin-bootstrap-table .popover,
+:root[data-theme="dark"] .admin-bootstrap-table .form-control,
+:root[data-theme="dark"] .admin-bootstrap-table .form-select,
+:root[data-theme="dark"] .admin-bootstrap-table .page-link {
+    color-scheme: dark;
+    background-color: var(--z-surface);
+    color: var(--z-primary);
+    border-color: var(--z-border);
+}
+
+@media (max-width: 720px) {
+    .admin-bootstrap-table .table-card > .table-row {
+        padding: 0.85rem;
+    }
+
+    .admin-bootstrap-table .table-card .table-cell {
+        gap: 0.35rem;
+    }
+
+    .admin-users-command-actions > .admin-ghost-button,
+    .admin-users-command-actions > .admin-primary-button {
+        flex: 1 1 10rem;
+    }
+}
+
 .admin-sort-indicator {
     color: inherit;
 }
@@ -791,6 +1071,7 @@
 }
 
 .admin-avatar {
+    margin: 0.15rem;
     width: 32px; height: 32px;
     border-radius: 50%;
     background: var(--z-primary-10);
@@ -1237,6 +1518,24 @@
     .admin-hero-actions {
         justify-content: flex-start;
         flex-wrap: wrap;
+    }
+
+    .admin-users-command-bar,
+    .admin-users-search-stack {
+        align-items: stretch;
+    }
+
+    .admin-users-search-stack {
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .admin-users-search-field {
+        max-width: none;
+    }
+
+    .admin-users-command-actions {
+        margin-left: 0;
     }
 
 

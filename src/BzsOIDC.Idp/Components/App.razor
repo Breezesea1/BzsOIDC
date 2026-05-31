@@ -10,6 +10,8 @@
     <ResourcePreloader/>
     @* External bootstrap script: pre-paint theme resolve + global culture helper *@
     <script src="@Assets["js/app-bootstrap.js"]"></script>
+    @* BootstrapBlazor assets are global static-web-assets; Users scopes the component root locally and app/admin CSS loads after this bundle for containment. *@
+    <link rel="stylesheet" href="_content/BootstrapBlazor/css/bootstrap.blazor.bundle.min.css"/>
     <link rel="stylesheet" href="@Assets["app.css"]"/>
     <link rel="stylesheet" href="@Assets["BzsOIDC.Idp.styles.css"]"/>
     <link rel="stylesheet" href="_content/Blazor-ApexCharts/css/apexcharts.css"/>
@@ -21,6 +23,7 @@
 <body>
 <Routes/>
 <script src="@Assets["_framework/blazor.web.js"]"></script>
+<script src="_content/BootstrapBlazor/js/bootstrap.blazor.bundle.min.js"></script>
 <script src="@Assets["lib/gsap/gsap.min.js"]"></script>
 </body>
 

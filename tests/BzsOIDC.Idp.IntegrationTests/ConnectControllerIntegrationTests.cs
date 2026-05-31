@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using BootstrapBlazor.Components;
 using BzsOIDC.Idp.Components;
 using BzsOIDC.Idp.Controllers;
 using BzsOIDC.Idp.Models;
@@ -1090,7 +1091,7 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
         {
             ["IdpIssuer"] = BaseUri.ToString().TrimEnd('/'),
             ["Identity:Admin:UserName"] = "admin",
-            ["Identity:Admin:Password"] = "Passw0rd!",
+            ["Identity:Admin:Password"] = "admin123",
             ["PermissionPolicy:PolicyPrefix"] = PermissionPolicyOptions.DefaultPolicyPrefix,
             ["Authentication:GitHub:ClientId"] = "gho_test_valid_client_id",
             ["Authentication:GitHub:ClientSecret"] = "ghs_test_valid_client_secret",
@@ -1099,6 +1100,7 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
 
         builder.Services.AddMemoryCache();
         builder.Services.AddHttpContextAccessor();
+        builder.Services.AddBootstrapBlazor();
         builder.Services.AddLocalization(options => { options.ResourcesPath = "Resources"; });
         builder.Services.AddForwardedHeaders();
         builder.Services.AddExternalAuthenticationServices(builder.Configuration);
@@ -1272,7 +1274,7 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
             new FormUrlEncodedContent(new Dictionary<string, string>
             {
                 ["UserName"] = "admin",
-                ["Password"] = "Passw0rd!",
+                ["Password"] = "admin123",
                 ["RememberMe"] = bool.TrueString,
             }));
 

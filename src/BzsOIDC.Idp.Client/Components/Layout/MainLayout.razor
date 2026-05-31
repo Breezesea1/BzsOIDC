@@ -1,3 +1,4 @@
+@using BootstrapBlazor.Components
 @using System.Globalization
 @using System.Text
 @using Microsoft.Extensions.Localization
@@ -35,7 +36,10 @@
         </header>
 
         <article class="layout-content">
-            @Body
+            @* BootstrapBlazor Table requires the root provider above routed content; assets remain ordered before app/admin CSS for containment. *@
+            <BootstrapBlazorRoot>
+                @Body
+            </BootstrapBlazorRoot>
         </article>
     </main>
 </div>

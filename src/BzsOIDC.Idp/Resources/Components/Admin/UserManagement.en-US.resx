@@ -13,6 +13,7 @@
   <data name="HeroLead" xml:space="preserve"><value>Manage sign-in accounts.</value></data>
   <data name="FilterByRole" xml:space="preserve"><value>Filter by role</value></data>
   <data name="Refresh" xml:space="preserve"><value>Refresh</value></data>
+  <data name="SelectedRows" xml:space="preserve"><value>{0} selected</value></data>
   <data name="NewUser" xml:space="preserve"><value>New User</value></data>
   <data name="All" xml:space="preserve"><value>All</value></data>
   <data name="Standard" xml:space="preserve"><value>Standard</value></data>
@@ -43,6 +44,7 @@
   <data name="Role" xml:space="preserve"><value>Role</value></data>
   <data name="Email" xml:space="preserve"><value>Email</value></data>
   <data name="Identifier" xml:space="preserve"><value>Identifier</value></data>
+  <data name="Select" xml:space="preserve"><value>Select</value></data>
   <data name="Actions" xml:space="preserve"><value>Actions</value></data>
   <data name="NoMatchingUsers" xml:space="preserve"><value>No matching users</value></data>
   <data name="NoMatchingUsersLead" xml:space="preserve"><value>Try another keyword or create an account.</value></data>
