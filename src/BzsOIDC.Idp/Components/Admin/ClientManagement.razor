@@ -3,18 +3,16 @@
 @using BzsOIDC.Idp.Services.Identity
 @using BzsOIDC.Idp.Services.Oidc
 @using BzsOIDC.Shared.Infrastructure.Authorization
+@using BootstrapBlazor.Components
 @using Microsoft.AspNetCore.WebUtilities
 @using Microsoft.Extensions.Localization
-@using Microsoft.JSInterop
 @using OpenIddict.Abstractions
 @inject IHttpContextAccessor HttpContextAccessor
 @inject IOidcClientService ClientService
 @inject IOidcScopeService ScopeService
 @inject IStringLocalizer<ClientManagement> L
 @inject NavigationManager NavigationManager
-@inject IJSRuntime JS
 @layout BzsOIDC.Idp.Client.Components.Layout.MainLayout
-@implements IAsyncDisposable
 
 <PageTitle>@L["PageTitle"]</PageTitle>
 
@@ -111,177 +109,166 @@ else
             </div>
         </div>
 
-        <div class="admin-table-shell" @ref="_tableShell">
-            <table class="admin-table">
-                <colgroup>
-                    <col data-column-key="client" />
-                    <col data-column-key="authFlow" />
-                    <col data-column-key="consentType" />
-                    <col data-column-key="grantTypes" />
-                    <col data-column-key="scopes" />
-                    <col data-column-key="redirectUris" />
-                    <col data-column-key="actions" />
-                </colgroup>
-                <thead>
-                    <tr>
-                        <th data-column-key="client" data-min-width="236" aria-sort="@GetAriaSort(ClientSortField.Client)">
-                            <div class="admin-column-head">
-                                <button type="button" class="admin-sort-btn" @onclick='() => ToggleSort(ClientSortField.Client)'>@L["Client"] <span class="admin-sort-indicator" aria-hidden="true">@GetSortIndicator(ClientSortField.Client)</span></button>
-                                <span class="admin-col-resizer" data-column-key="client" role="separator" aria-orientation="vertical" tabindex="0" aria-label='@L["ResizeColumn", L["Client"]]'></span>
-                            </div>
-                        </th>
-                        <th data-column-key="authFlow" data-min-width="164" aria-sort="@GetAriaSort(ClientSortField.AuthFlow)">
-                            <div class="admin-column-head">
-                                <button type="button" class="admin-sort-btn" @onclick='() => ToggleSort(ClientSortField.AuthFlow)'>@L["AuthFlow"] <span class="admin-sort-indicator" aria-hidden="true">@GetSortIndicator(ClientSortField.AuthFlow)</span></button>
-                                <span class="admin-col-resizer" data-column-key="authFlow" role="separator" aria-orientation="vertical" tabindex="0" aria-label='@L["ResizeColumn", L["AuthFlow"]]'></span>
-                            </div>
-                        </th>
-                        <th data-column-key="consentType" data-min-width="156">
-                            <div class="admin-column-head">
-                                <span class="admin-column-label">@L["ConsentType"]</span>
-                                <span class="admin-col-resizer" data-column-key="consentType" role="separator" aria-orientation="vertical" tabindex="0" aria-label='@L["ResizeColumn", L["ConsentType"]]'></span>
-                            </div>
-                        </th>
-                        <th data-column-key="grantTypes" data-min-width="176">
-                            <div class="admin-column-head">
-                                <span class="admin-column-label">@L["GrantTypes"]</span>
-                                <span class="admin-col-resizer" data-column-key="grantTypes" role="separator" aria-orientation="vertical" tabindex="0" aria-label='@L["ResizeColumn", L["GrantTypes"]]'></span>
-                            </div>
-                        </th>
-                        <th data-column-key="scopes" data-min-width="176">
-                            <div class="admin-column-head">
-                                <span class="admin-column-label">@L["Scopes"]</span>
-                                <span class="admin-col-resizer" data-column-key="scopes" role="separator" aria-orientation="vertical" tabindex="0" aria-label='@L["ResizeColumn", L["Scopes"]]'></span>
-                            </div>
-                        </th>
-                        <th data-column-key="redirectUris" data-min-width="188">
-                            <div class="admin-column-head">
-                                <span class="admin-column-label">@L["RedirectUris"]</span>
-                                <span class="admin-col-resizer" data-column-key="redirectUris" role="separator" aria-orientation="vertical" tabindex="0" aria-label='@L["ResizeColumn", L["RedirectUris"]]'></span>
-                            </div>
-                        </th>
-                        <th data-column-key="actions" data-min-width="112" class="admin-actions-header">
-                            <div class="admin-column-head admin-column-head-actions">
-                                <span class="admin-column-label">@L["Actions"]</span>
-                                <span class="admin-col-resizer" data-column-key="actions" role="separator" aria-orientation="vertical" tabindex="0" aria-label='@L["ResizeColumn", L["Actions"]]'></span>
-                            </div>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (_filteredClients.Count == 0)
-                    {
-                        <tr class="admin-empty-row">
-                            <td colspan="7">
-                                <div class="admin-empty-state">
-                                    <strong>@L["NoMatchingClients"]</strong>
-                                    <p>@L["NoMatchingClientsLead"]</p>
+        <div class="admin-table-shell admin-bootstrap-table" data-testid="clients-table">
+            <Table TItem="ClientRow"
+                   @ref="_table"
+                   PageItems="@_pageSize"
+                   PageItemsSource="PageSizeOptions"
+                   IsPagination="false"
+                   AllowResizing="true"
+                   DefaultFixedColumnWidth="200"
+                   ColumnMinWidth="72"
+                   ShowColumnWidthTooltip="true"
+                   ShowCardView="false"
+                   ShowColumnList="false"
+                   ShowFilterHeader="false"
+                   ShowMultiFilterHeader="false"
+                   ShowFooter="false"
+                   ShowEmpty="true"
+                   ShowLoading="true"
+                   ShowLoadingInFirstRender="true"
+                   OnQueryAsync="QueryClientsAsync">
+                <TableColumns Context="client">
+                    <TableColumn Text="@L["Client"]"
+                                 Sortable="true"
+                                 Searchable="true"
+                                 Filterable="false"
+                                 SortName="ClientId"
+                                 @bind-Field="client.ClientId">
+                        <Template Context="row">
+                            <div class="admin-client-row">
+                                <span class="admin-avatar" aria-hidden="true">@GetClientInitial(row.Row)</span>
+                                <div class="admin-client-primary-cell">
+                                    <strong>@(string.IsNullOrWhiteSpace(row.Row.DisplayName) ? row.Row.ClientId : row.Row.DisplayName)</strong>
+                                    <span class="admin-inline-code">@row.Row.ClientId</span>
                                 </div>
-                            </td>
-                        </tr>
-                    }
-                    else
-                    {
-                        @foreach (var client in _visibleClients)
-                        {
-                            <tr class="admin-table-row" @key="client.ClientId">
-                                <td class="admin-cell-primary">
-                                    <div class="admin-client-row">
-                                        <span class="admin-avatar" aria-hidden="true">@GetClientInitial(client)</span>
-                                        <div class="admin-client-primary-cell">
-                                            <strong>@(string.IsNullOrWhiteSpace(client.DisplayName) ? client.ClientId : client.DisplayName)</strong>
-                                            <span class="admin-inline-code">@client.ClientId</span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td data-label='@L["AuthFlow"].Value'>
-                                    <span class="admin-badge @(client.AuthFlow == OidcClientAuthFlow.AuthorizationCode ? "is-admin" : "is-standard")">
-                                        @FormatAuthFlow(client.AuthFlow)
-                                    </span>
-                                </td>
-                                <td data-label='@L["ConsentType"].Value'>
-                                    <span class="admin-badge @(client.ConsentType == OidcClientConsentType.Explicit ? "is-admin" : "is-standard")">
-                                        @FormatConsentType(client.ConsentType)
-                                    </span>
-                                </td>
-                                <td data-label='@L["GrantTypes"].Value'>
-                                    <div class="admin-token-list">
-                                        @foreach (var item in GetPreviewItems(client.GrantTypes))
-                                        {
-                                            <span class="admin-token">@item</span>
-                                        }
-                                        @if (GetOverflowCount(client.GrantTypes) > 0)
-                                        {
-                                            <span class="admin-token admin-token-overflow">+@GetOverflowCount(client.GrantTypes)</span>
-                                        }
-                                    </div>
-                                </td>
-                                <td data-label='@L["Scopes"].Value'>
-                                    <div class="admin-token-list">
-                                        @foreach (var item in GetPreviewItems(client.Scopes))
-                                        {
-                                            <span class="admin-token">@item</span>
-                                        }
-                                        @if (GetOverflowCount(client.Scopes) > 0)
-                                        {
-                                            <span class="admin-token admin-token-overflow">+@GetOverflowCount(client.Scopes)</span>
-                                        }
-                                    </div>
-                                </td>
-                                <td data-label='@L["RedirectUris"].Value'>
-                                    <div class="admin-client-text-stack">
-                                        @if (GetUriPreviewSource(client).Count == 0)
-                                        {
-                                            <span class="admin-user-meta">—</span>
-                                        }
-                                        else
-                                        {
-                                            @foreach (var uri in GetPreviewItems(GetUriPreviewSource(client)))
-                                            {
-                                                <span class="admin-user-meta admin-uri-preview">@uri</span>
-                                            }
-                                            @if (GetOverflowCount(GetUriPreviewSource(client)) > 0)
-                                            {
-                                                <span class="admin-user-meta">@L["MoreCount", GetOverflowCount(GetUriPreviewSource(client))]</span>
-                                            }
-                                        }
-                                    </div>
-                                </td>
-                                <td data-label='@L["Actions"].Value'>
-                                    <div class="admin-actions-column">
-                                        <button type="button"
-                                                class="admin-icon-button"
-                                                title="@L["Edit"]"
-                                                aria-label="@L["Edit"]"
-                                                @onclick:stopPropagation="true"
-                                                @onclick="() => BeginEdit(client)">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                                <path d="M12 20h9" />
-                                                <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z" />
-                                            </svg>
-                                        </button>
-                                        <button type="button"
-                                                class="admin-icon-button danger"
-                                                title="@L["Delete"]"
-                                                aria-label="@L["Delete"]"
-                                                @onclick:stopPropagation="true"
-                                                @onclick="() => DeleteClientAsync(client.ClientId)"
-                                                disabled="@_isBusy">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                                <path d="M3 6h18" />
-                                                <path d="M8 6V4h8v2" />
-                                                <path d="M19 6l-1 14H6L5 6" />
-                                                <path d="M10 11v6" />
-                                                <path d="M14 11v6" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        }
-                    }
-                </tbody>
-            </table>
+                            </div>
+                        </Template>
+                    </TableColumn>
+                    <TableColumn Text="@L["AuthFlow"]"
+                                 Sortable="true"
+                                 Searchable="true"
+                                 Filterable="false"
+                                 SortName="AuthFlow"
+                                 @bind-Field="client.AuthFlow">
+                        <Template Context="row">
+                            <span class="admin-badge @(row.Row.AuthFlow == OidcClientAuthFlow.AuthorizationCode ? "is-admin" : "is-standard")">
+                                @FormatAuthFlow(row.Row.AuthFlow)
+                            </span>
+                        </Template>
+                    </TableColumn>
+                    <TableColumn Text="@L["ConsentType"]"
+                                 Sortable="true"
+                                 Searchable="true"
+                                 Filterable="false"
+                                 SortName="ConsentType"
+                                 @bind-Field="client.ConsentType">
+                        <Template Context="row">
+                            <span class="admin-badge @(row.Row.ConsentType == OidcClientConsentType.Explicit ? "is-admin" : "is-standard")">
+                                @FormatConsentType(row.Row.ConsentType)
+                            </span>
+                        </Template>
+                    </TableColumn>
+                    <TableColumn Text="@L["GrantTypes"]"
+                                 Searchable="true"
+                                 Filterable="false"
+                                 SortName="GrantTypesText"
+                                 @bind-Field="client.GrantTypesText">
+                        <Template Context="row">
+                            <div class="admin-token-list">
+                                @foreach (var item in GetPreviewItems(row.Row.GrantTypes))
+                                {
+                                    <span class="admin-token">@item</span>
+                                }
+                                @if (GetOverflowCount(row.Row.GrantTypes) > 0)
+                                {
+                                    <span class="admin-token admin-token-overflow">+@GetOverflowCount(row.Row.GrantTypes)</span>
+                                }
+                            </div>
+                        </Template>
+                    </TableColumn>
+                    <TableColumn Text="@L["Scopes"]"
+                                 Searchable="true"
+                                 Filterable="false"
+                                 SortName="ScopesText"
+                                 @bind-Field="client.ScopesText">
+                        <Template Context="row">
+                            <div class="admin-token-list">
+                                @foreach (var item in GetPreviewItems(row.Row.Scopes))
+                                {
+                                    <span class="admin-token">@item</span>
+                                }
+                                @if (GetOverflowCount(row.Row.Scopes) > 0)
+                                {
+                                    <span class="admin-token admin-token-overflow">+@GetOverflowCount(row.Row.Scopes)</span>
+                                }
+                            </div>
+                        </Template>
+                    </TableColumn>
+                    <TableColumn Text="@L["RedirectUris"]"
+                                 Searchable="true"
+                                 Filterable="false"
+                                 SortName="RedirectUrisText"
+                                 @bind-Field="client.RedirectUrisText">
+                        <Template Context="row">
+                            @{ var uriPreviewSource = GetUriPreviewSource(row.Row); }
+                            <div class="admin-client-text-stack">
+                                @if (uriPreviewSource.Count == 0)
+                                {
+                                    <span class="admin-user-meta">—</span>
+                                }
+                                else
+                                {
+                                    @foreach (var uri in GetPreviewItems(uriPreviewSource))
+                                    {
+                                        <span class="admin-user-meta admin-uri-preview">@uri</span>
+                                    }
+                                    @if (GetOverflowCount(uriPreviewSource) > 0)
+                                    {
+                                        <span class="admin-user-meta">@L["MoreCount", GetOverflowCount(uriPreviewSource)]</span>
+                                    }
+                                }
+                            </div>
+                        </Template>
+                    </TableColumn>
+                    <TableColumn Text="@L["Actions"]"
+                                 Filterable="false"
+                                 Searchable="false"
+                                 Sortable="false"
+                                 @bind-Field="client.ActionKey">
+                        <Template Context="row">
+                            <div class="admin-actions-column">
+                                <button type="button"
+                                        class="admin-icon-button"
+                                        title="@L["Edit"]"
+                                        aria-label="@L["Edit"]"
+                                        @onclick:stopPropagation="true"
+                                        @onclick="() => BeginEdit(row.Row)">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M12 20h9" />
+                                        <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z" />
+                                    </svg>
+                                </button>
+                                <button type="button"
+                                        class="admin-icon-button danger"
+                                        title="@L["Delete"]"
+                                        aria-label="@L["Delete"]"
+                                        @onclick:stopPropagation="true"
+                                        @onclick="() => DeleteClientAsync(row.Row.ClientId)"
+                                        disabled="@_isBusy">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M3 6h18" />
+                                        <path d="M8 6V4h8v2" />
+                                        <path d="M19 6l-1 14H6L5 6" />
+                                        <path d="M10 11v6" />
+                                        <path d="M14 11v6" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </Template>
+                    </TableColumn>
+                </TableColumns>
+            </Table>
         </div>
 
         <div class="admin-pagination-bar">
@@ -342,15 +329,14 @@ else
 }
 
 @code {
-    private readonly List<OidcClientResponse> _clients = [];
-    private readonly List<OidcClientResponse> _filteredClients = [];
+    private readonly List<ClientRow> _clients = [];
+    private readonly List<ClientRow> _filteredClients = [];
     private readonly List<string> _availableScopes = [];
-    private readonly List<OidcClientResponse> _visibleClients = [];
+    private readonly List<ClientRow> _visibleClients = [];
     private readonly List<string> _formErrors = [];
     private static readonly int[] PageSizeOptions = [10, 20, 50];
 
     private ClientEditor _editor = CreateDefaultEditor();
-    private ElementReference _tableShell;
     private bool _hasAccess;
     private bool _isBusy;
     private bool _isEditing;
@@ -359,12 +345,10 @@ else
     private int _pageSize = 10;
     private string _searchTerm = string.Empty;
     private OidcClientAuthFlow? _authFlowFilter;
-    private ClientSortField _sortField = ClientSortField.Client;
-    private bool _sortDescending;
     private string? _generatedClientSecret;
     private string? _statusMessage;
     private bool _statusIsError;
-    private IJSObjectReference? _tableModule;
+    private Table<ClientRow>? _table;
 
     private int AuthorizationCodeCount => _clients.Count(static client => client.AuthFlow == OidcClientAuthFlow.AuthorizationCode);
     private int ClientCredentialsCount => _clients.Count(static client => client.AuthFlow == OidcClientAuthFlow.ClientCredentials);
@@ -379,7 +363,6 @@ else
     private int PageEndIndex => Math.Min(_filteredClients.Count, ((_currentPage - 1) * _pageSize) + _visibleClients.Count);
     private int PageStartIndex => _filteredClients.Count == 0 ? 0 : ((_currentPage - 1) * _pageSize) + 1;
     private int TotalPages => Math.Max(1, (int)Math.Ceiling(_filteredClients.Count / (double)_pageSize));
-    private IQueryable<OidcClientResponse> VisibleClients => _visibleClients.AsQueryable();
 
     protected override async Task OnInitializedAsync()
     {
@@ -389,19 +372,6 @@ else
         }
 
         await LoadClientsAsync();
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            _tableModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/admin-resizable-table.js");
-        }
-
-        if (_tableModule is not null && _filteredClients.Count > 0)
-        {
-            await _tableModule.InvokeVoidAsync("activate", _tableShell, "admin-clients-table");
-        }
     }
 
     private bool EnsureAdminAccess()
@@ -435,11 +405,11 @@ else
         try
         {
             _clients.Clear();
-            _clients.AddRange(await ClientService.GetAllAsync());
+            _clients.AddRange((await ClientService.GetAllAsync()).Select(ClientRow.FromResponse));
             _availableScopes.Clear();
             _availableScopes.AddRange((await ScopeService.GetAllAsync()).Select(static scope => scope.Name));
             _availableScopes.Sort(StringComparer.OrdinalIgnoreCase);
-            ApplyFilter();
+            await RefreshClientsAsync(_currentPage);
         }
         finally
         {
@@ -447,20 +417,51 @@ else
         }
     }
 
-    private void ApplyFilter()
+    private Task<QueryData<ClientRow>> QueryClientsAsync(QueryPageOptions options)
     {
-        _filteredClients.Clear();
+        _currentPage = Math.Max(1, options.PageIndex);
 
-        IEnumerable<OidcClientResponse> query = _clients;
-        
-        if (_authFlowFilter.HasValue)
+        var filtered = ApplyFilters(options);
+        var sorted = ApplySort(filtered, options.SortName, options.SortOrder).ToList();
+        var totalCount = sorted.Count;
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)_pageSize));
+        if (_currentPage > totalPages)
         {
-            query = query.Where(c => c.AuthFlow == _authFlowFilter.Value);
+            _currentPage = totalPages;
         }
 
-        if (!string.IsNullOrWhiteSpace(_searchTerm))
+        var visible = sorted
+            .Skip((_currentPage - 1) * _pageSize)
+            .Take(_pageSize)
+            .ToList();
+
+        _filteredClients.Clear();
+        _filteredClients.AddRange(sorted);
+        _visibleClients.Clear();
+        _visibleClients.AddRange(visible);
+
+        return Task.FromResult(new QueryData<ClientRow>
         {
-            var searchTerm = _searchTerm.Trim();
+            Items = visible,
+            TotalCount = totalCount,
+            IsFiltered = true,
+            IsSorted = true,
+            IsSearch = true,
+        });
+    }
+
+    private IEnumerable<ClientRow> ApplyFilters(QueryPageOptions options)
+    {
+        IEnumerable<ClientRow> query = _clients;
+
+        if (_authFlowFilter.HasValue)
+        {
+            query = query.Where(client => client.AuthFlow == _authFlowFilter.Value);
+        }
+
+        var searchTerm = _searchTerm.Trim();
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
             query = query
                 .Select(client => new
                 {
@@ -471,34 +472,44 @@ else
                         client.DisplayName,
                         FormatAuthFlow(client.AuthFlow),
                         FormatConsentType(client.ConsentType),
-                        string.Join(' ', client.GrantTypes),
-                        string.Join(' ', client.Scopes),
-                        string.Join(' ', client.RedirectUris),
-                        string.Join(' ', client.PostLogoutRedirectUris))
+                        client.GrantTypesText,
+                        client.ScopesText,
+                        client.RedirectUrisText)
                 })
                 .Where(static result => result.Score.HasValue)
                 .OrderBy(static result => result.Score)
                 .Select(static result => result.Client);
         }
 
-        query = ApplySort(query);
-
-        _filteredClients.AddRange(query);
-        UpdateVisibleClients(resetPage: true);
-    }
-
-    private void UpdateVisibleClients(bool resetPage = false)
-    {
-        if (resetPage)
+        var tableFilter = options.Filters.Count > 0
+            ? options.ToFilterFunc<ClientRow>(StringComparison.OrdinalIgnoreCase)
+            : null;
+        if (tableFilter is not null)
         {
-            _currentPage = 1;
+            query = query.Where(tableFilter);
         }
 
-        _currentPage = Math.Clamp(_currentPage, 1, TotalPages);
-        _visibleClients.Clear();
-        _visibleClients.AddRange(_filteredClients
-            .Skip((_currentPage - 1) * _pageSize)
-            .Take(_pageSize));
+        return query;
+    }
+
+    private static IEnumerable<ClientRow> ApplySort(IEnumerable<ClientRow> query, string? sortName, SortOrder sortOrder)
+    {
+        var descending = sortOrder == SortOrder.Desc;
+        return sortName switch
+        {
+            nameof(ClientRow.AuthFlow) => descending
+                ? query.OrderByDescending(static client => client.AuthFlow).ThenBy(static client => client.DisplayName ?? client.ClientId, StringComparer.OrdinalIgnoreCase)
+                : query.OrderBy(static client => client.AuthFlow).ThenBy(static client => client.DisplayName ?? client.ClientId, StringComparer.OrdinalIgnoreCase),
+            nameof(ClientRow.ConsentType) => descending
+                ? query.OrderByDescending(static client => client.ConsentType).ThenBy(static client => client.DisplayName ?? client.ClientId, StringComparer.OrdinalIgnoreCase)
+                : query.OrderBy(static client => client.ConsentType).ThenBy(static client => client.DisplayName ?? client.ClientId, StringComparer.OrdinalIgnoreCase),
+            nameof(ClientRow.DisplayName) => descending
+                ? query.OrderByDescending(static client => client.DisplayName ?? client.ClientId, StringComparer.OrdinalIgnoreCase)
+                : query.OrderBy(static client => client.DisplayName ?? client.ClientId, StringComparer.OrdinalIgnoreCase),
+            _ => descending
+                ? query.OrderByDescending(static client => client.ClientId, StringComparer.OrdinalIgnoreCase)
+                : query.OrderBy(static client => client.ClientId, StringComparer.OrdinalIgnoreCase),
+        };
     }
 
     private void BeginCreate()
@@ -508,7 +519,7 @@ else
         ClearStatus();
     }
 
-    private void BeginEdit(OidcClientResponse client)
+    private void BeginEdit(ClientRow client)
     {
         _isEditing = true;
         _isEditorOpen = true;
@@ -785,7 +796,13 @@ else
         };
     }
 
-    private IReadOnlyList<string> GetUriPreviewSource(OidcClientResponse client)
+    private static string GetClientInitial(ClientRow client)
+    {
+        var name = string.IsNullOrWhiteSpace(client.DisplayName) ? client.ClientId : client.DisplayName;
+        return string.IsNullOrWhiteSpace(name) ? "?" : name[0].ToString().ToUpperInvariant();
+    }
+
+    private IReadOnlyList<string> GetUriPreviewSource(ClientRow client)
     {
         if (client.RedirectUris.Length == 0 && client.PostLogoutRedirectUris.Length == 0)
         {
@@ -827,13 +844,31 @@ else
         _statusIsError = false;
     }
 
-    private void HandleSearchInput(ChangeEventArgs args)
+    private async Task RefreshClientsAsync(int? pageIndex = null)
     {
-        _searchTerm = args.Value?.ToString() ?? string.Empty;
-        ApplyFilter();
+        if (_table is null)
+        {
+            _currentPage = pageIndex ?? _currentPage;
+            await QueryClientsAsync(new QueryPageOptions
+            {
+                PageIndex = _currentPage,
+                PageItems = _pageSize,
+            });
+            StateHasChanged();
+            return;
+        }
+
+        await _table.QueryAsync(pageIndex);
+        StateHasChanged();
     }
 
-    private void HandlePageSizeChange(ChangeEventArgs args)
+    private async Task HandleSearchInput(ChangeEventArgs args)
+    {
+        _searchTerm = args.Value?.ToString() ?? string.Empty;
+        await RefreshClientsAsync(1);
+    }
+
+    private async Task HandlePageSizeChange(ChangeEventArgs args)
     {
         if (!int.TryParse(args.Value?.ToString(), out var pageSize) || pageSize <= 0)
         {
@@ -841,29 +876,32 @@ else
         }
 
         _pageSize = pageSize;
-        UpdateVisibleClients(resetPage: true);
+        await RefreshClientsAsync(1);
     }
 
-    private void GoToNextPage()
+    private async Task GoToNextPage()
     {
         if (!CanGoToNextPage)
         {
             return;
         }
 
-        _currentPage++;
-        UpdateVisibleClients();
+        await RefreshClientsAsync(_currentPage + 1);
     }
 
-    private void GoToPreviousPage()
+    private async Task GoToPreviousPage()
     {
         if (!CanGoToPreviousPage)
         {
             return;
         }
 
-        _currentPage--;
-        UpdateVisibleClients();
+        await RefreshClientsAsync(_currentPage - 1);
+    }
+
+    private async Task GoToPage(int page)
+    {
+        await RefreshClientsAsync(Math.Clamp(page, 1, TotalPages));
     }
 
     private Task HandleClientIdChanged(string value)
@@ -930,80 +968,10 @@ else
         return Task.CompletedTask;
     }
 
-    private void SetAuthFlowFilter(OidcClientAuthFlow? filter)
+    private async Task SetAuthFlowFilter(OidcClientAuthFlow? filter)
     {
         _authFlowFilter = filter;
-        ApplyFilter();
-    }
-
-    private IEnumerable<OidcClientResponse> ApplySort(IEnumerable<OidcClientResponse> query)
-    {
-        return (_sortField, _sortDescending) switch
-        {
-            (ClientSortField.Client, false) => query.OrderBy(static client => client.ClientId, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(static client => client.DisplayName ?? client.ClientId, StringComparer.OrdinalIgnoreCase),
-            (ClientSortField.Client, true) => query.OrderByDescending(static client => client.ClientId, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(static client => client.DisplayName ?? client.ClientId, StringComparer.OrdinalIgnoreCase),
-            (ClientSortField.AuthFlow, false) => query.OrderBy(static client => client.AuthFlow).ThenBy(static client => client.DisplayName ?? client.ClientId, StringComparer.OrdinalIgnoreCase),
-            (ClientSortField.AuthFlow, true) => query.OrderByDescending(static client => client.AuthFlow).ThenBy(static client => client.DisplayName ?? client.ClientId, StringComparer.OrdinalIgnoreCase),
-            (_, true) => query.OrderByDescending(static client => client.ClientId, StringComparer.OrdinalIgnoreCase),
-            _ => query.OrderBy(static client => client.ClientId, StringComparer.OrdinalIgnoreCase),
-        };
-    }
-
-    private void ToggleSort(ClientSortField field)
-    {
-        if (_sortField == field)
-        {
-            _sortDescending = !_sortDescending;
-        }
-        else
-        {
-            _sortField = field;
-            _sortDescending = false;
-        }
-
-        ApplyFilter();
-    }
-
-    private string GetAriaSort(ClientSortField field)
-    {
-        if (_sortField != field)
-        {
-            return "none";
-        }
-
-        return _sortDescending ? "descending" : "ascending";
-    }
-
-    private string GetSortIndicator(ClientSortField field)
-    {
-        if (_sortField != field)
-        {
-            return "↕";
-        }
-
-        return _sortDescending ? "↓" : "↑";
-    }
-
-    private static string GetClientInitial(OidcClientResponse client)
-    {
-        var name = string.IsNullOrWhiteSpace(client.DisplayName) ? client.ClientId : client.DisplayName;
-        return string.IsNullOrWhiteSpace(name) ? "?" : name[0].ToString().ToUpperInvariant();
-    }
-
-    private static string GetClientAvatarColor(OidcClientResponse client)
-    {
-        var name = string.IsNullOrWhiteSpace(client.DisplayName) ? client.ClientId : client.DisplayName;
-        if (string.IsNullOrWhiteSpace(name)) return "#64748b";
-        string[] colors = ["#16a34a", "#2563eb", "#7c3aed", "#ea580c", "#0891b2", "#db2777"];
-        return colors[Math.Abs(name[0]) % colors.Length];
-    }
-
-    private void GoToPage(int page)
-    {
-        _currentPage = Math.Clamp(page, 1, TotalPages);
-        UpdateVisibleClients();
+        await RefreshClientsAsync(1);
     }
 
     private sealed class ClientEditor
@@ -1018,29 +986,38 @@ else
         public string PostLogoutRedirectUrisText { get; set; } = string.Empty;
     }
 
-    private enum ClientSortField
+    private sealed class ClientRow
     {
-        Client,
-        AuthFlow,
-    }
+        public string ClientId { get; set; } = string.Empty;
+        public string? DisplayName { get; set; }
+        public OidcClientAuthFlow AuthFlow { get; set; }
+        public OidcClientConsentType ConsentType { get; set; }
+        public string[] GrantTypes { get; set; } = [];
+        public string[] Scopes { get; set; } = [];
+        public string[] RedirectUris { get; set; } = [];
+        public string[] PostLogoutRedirectUris { get; set; } = [];
+        public string GrantTypesText { get; set; } = string.Empty;
+        public string ScopesText { get; set; } = string.Empty;
+        public string RedirectUrisText { get; set; } = string.Empty;
+        public string ActionKey { get; set; } = string.Empty;
 
-    public async ValueTask DisposeAsync()
-    {
-        if (_tableModule is null)
+        public static ClientRow FromResponse(OidcClientResponse response)
         {
-            return;
-        }
-
-        try
-        {
-            await _tableModule.InvokeVoidAsync("dispose", _tableShell);
-            await _tableModule.DisposeAsync();
-        }
-        catch (JSDisconnectedException)
-        {
-        }
-        catch (ObjectDisposedException)
-        {
+            return new ClientRow
+            {
+                ClientId = response.ClientId,
+                DisplayName = response.DisplayName,
+                AuthFlow = response.AuthFlow,
+                ConsentType = response.ConsentType,
+                GrantTypes = response.GrantTypes,
+                Scopes = response.Scopes,
+                RedirectUris = response.RedirectUris,
+                PostLogoutRedirectUris = response.PostLogoutRedirectUris,
+                GrantTypesText = string.Join(' ', response.GrantTypes),
+                ScopesText = string.Join(' ', response.Scopes),
+                RedirectUrisText = string.Join(' ', response.RedirectUris.Concat(response.PostLogoutRedirectUris)),
+                ActionKey = response.ClientId,
+            };
         }
     }
 }

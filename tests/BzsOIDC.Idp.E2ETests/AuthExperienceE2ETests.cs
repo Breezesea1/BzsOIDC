@@ -98,7 +98,7 @@ public sealed class AuthExperienceE2ETests(AppHostFixture fixture) : E2EPageTest
         await AppUi.LoginAsAdminAsync(this, fixture, "/admin/users");
         await Expect(Page).ToHaveURLAsync(new Regex("/admin/users", RegexOptions.IgnoreCase), new() { Timeout = 30000 });
         await Page.GotoAsync(fixture.BuildUrl("/admin/users"));
-        await Page.Locator(".admin-table").WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 20000 });
+        await Page.Locator("[data-testid='users-table']").WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 20000 });
 
         await AppUi.LogoutAsync(this, fixture, "/admin/users");
 

@@ -14,6 +14,7 @@ using NSubstitute;
 
 namespace BzsOIDC.Idp.UnitTests.Components.Admin;
 
+[Collection("BootstrapBlazor component tests")]
 public sealed class UserManagementPageTests
 {
     [Fact]

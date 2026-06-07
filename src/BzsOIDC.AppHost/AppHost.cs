@@ -28,7 +28,8 @@ IResourceBuilder<RedisResource>? redis = null;
 
 if (!AppHostModelSettings.IsSmokeProfileEnabled(smokeTestingEnabled))
 {
-    var postgresBuilder = builder.AddPostgres("postgres");
+    var postgresBuilder = builder.AddPostgres("postgres")
+        .WithImageTag("17.6");
 
     if (AppHostModelSettings.ShouldUsePersistentPostgresVolume(e2eTestingEnabled))
     {

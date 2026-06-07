@@ -3,6 +3,7 @@
 @using BzsOIDC.Idp.Services.Identity
 @using BzsOIDC.Idp.Services.Oidc
 @using BzsOIDC.Shared.Infrastructure.Authorization
+@using BootstrapBlazor.Components
 @using Microsoft.AspNetCore.WebUtilities
 @using Microsoft.Extensions.Localization
 @inject IHttpContextAccessor HttpContextAccessor
@@ -164,129 +165,181 @@ else
             </div>
         </div>
 
-        <div class="admin-table-shell">
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>@L["ScopeName"]</th>
-                        <th>@L["DisplayName"]</th>
-                        <th>@L["Resources"]</th>
-                        <th>@L["Description"]</th>
-                        <th class="admin-actions-header">@L["Actions"]</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (_filteredScopes.Count == 0)
-                    {
-                        <tr class="admin-empty-row">
-                            <td colspan="5">
-                                <div class="admin-empty-state">
-                                    <strong>@L["NoMatchingScopes"]</strong>
-                                    <p>@L["NoMatchingScopesLead"]</p>
-                                </div>
-                            </td>
-                        </tr>
-                    }
-                    else
-                    {
-                        @foreach (var scope in _filteredScopes)
-                        {
-                            var scopeClients = GetScopeClients(scope.Name);
-                            var scopePermissions = GetScopePermissions(scope.Name);
-
-                            <tr class="admin-table-row" @key="scope.Name">
-                                <td class="admin-cell-primary">
-                                    <div class="admin-client-primary-cell">
-                                        <strong>@scope.Name</strong>
-                                        <span class="admin-user-meta">@L["ScopeUsage", scopeClients.Count, scopePermissions.Count]</span>
-                                    </div>
-                                </td>
-                                <td data-label='@L["DisplayName"].Value'>
-                                    <span class="admin-user-meta">@(string.IsNullOrWhiteSpace(scope.DisplayName) ? "—" : scope.DisplayName)</span>
-                                </td>
-                                <td data-label='@L["Resources"].Value'>
-                                    <div class="admin-token-list">
-                                        @foreach (var resource in GetPreviewItems(scope.Resources))
-                                        {
-                                            <span class="admin-token">@resource</span>
-                                        }
-                                        @if (GetOverflowCount(scope.Resources) > 0)
-                                        {
-                                            <span class="admin-token admin-token-overflow">+@GetOverflowCount(scope.Resources)</span>
-                                        }
-                                    </div>
-                                </td>
-                                <td data-label='@L["Description"].Value'>
-                                    <div class="admin-client-text-stack">
-                                        <span class="admin-user-meta">@(string.IsNullOrWhiteSpace(scope.Description) ? "—" : scope.Description)</span>
-                                        <details class="admin-details-inline">
-                                            <summary>@L["ScopeUsageDetails"]</summary>
-                                            <div class="admin-details-stack">
-                                                <div>
-                                                    <strong>@L["UsedByClients"]</strong>
-                                                    <div class="admin-token-list">
-                                                        @foreach (var client in scopeClients)
-                                                        {
-                                                            <span class="admin-token">@client</span>
-                                                        }
-                                                        @if (scopeClients.Count == 0)
-                                                        {
-                                                            <span class="admin-user-meta">@L["NoMatchingClients"]</span>
-                                                        }
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <strong>@L["ReleaseScopeUsage"]</strong>
-                                                    <div class="admin-token-list">
-                                                        @foreach (var permission in scopePermissions)
-                                                        {
-                                                            <span class="admin-token">@permission</span>
-                                                        }
-                                                        @if (scopePermissions.Count == 0)
-                                                        {
-                                                            <span class="admin-user-meta">@L["NoMatchingPermissions"]</span>
-                                                        }
-                                                    </div>
-                                                </div>
+        <div class="admin-table-shell admin-bootstrap-table" data-testid="scopes-table">
+            <Table TItem="ScopeRow"
+                   @ref="_table"
+                   PageItems="@_pageSize"
+                   PageItemsSource="PageSizeOptions"
+                   IsPagination="false"
+                   AllowResizing="true"
+                   DefaultFixedColumnWidth="200"
+                   ColumnMinWidth="72"
+                   ShowColumnWidthTooltip="true"
+                   ShowCardView="false"
+                   ShowColumnList="false"
+                   ShowFilterHeader="false"
+                   ShowMultiFilterHeader="false"
+                   ShowFooter="false"
+                   ShowEmpty="true"
+                   ShowLoading="true"
+                   ShowLoadingInFirstRender="true"
+                   OnQueryAsync="QueryScopesAsync">
+                <TableColumns Context="scope">
+                    <TableColumn Text="@L["ScopeName"]"
+                                 Sortable="true"
+                                 Searchable="true"
+                                 Filterable="false"
+                                 SortName="Name"
+                                 @bind-Field="scope.Name">
+                        <Template Context="row">
+                            <div class="admin-client-primary-cell">
+                                <strong>@row.Row.Name</strong>
+                                <span class="admin-user-meta">@L["ScopeUsage", GetScopeClients(row.Row.Name).Count, GetScopePermissions(row.Row.Name).Count]</span>
+                            </div>
+                        </Template>
+                    </TableColumn>
+                    <TableColumn Text="@L["DisplayName"]"
+                                 Sortable="true"
+                                 Searchable="true"
+                                 Filterable="false"
+                                 SortName="DisplayName"
+                                 @bind-Field="scope.DisplayName">
+                        <Template Context="row">
+                            <span class="admin-user-meta">@(string.IsNullOrWhiteSpace(row.Row.DisplayName) ? "—" : row.Row.DisplayName)</span>
+                        </Template>
+                    </TableColumn>
+                    <TableColumn Text="@L["Resources"]"
+                                 Searchable="true"
+                                 Filterable="false"
+                                 SortName="ResourcesText"
+                                 @bind-Field="scope.ResourcesText">
+                        <Template Context="row">
+                            <div class="admin-token-list">
+                                @foreach (var resource in GetPreviewItems(row.Row.Resources))
+                                {
+                                    <span class="admin-token">@resource</span>
+                                }
+                                @if (GetOverflowCount(row.Row.Resources) > 0)
+                                {
+                                    <span class="admin-token admin-token-overflow">+@GetOverflowCount(row.Row.Resources)</span>
+                                }
+                            </div>
+                        </Template>
+                    </TableColumn>
+                    <TableColumn Text="@L["Description"]"
+                                 Searchable="true"
+                                 Filterable="false"
+                                 SortName="Description"
+                                 @bind-Field="scope.Description">
+                        <Template Context="row">
+                            @{
+                                var scopeClients = GetScopeClients(row.Row.Name);
+                                var scopePermissions = GetScopePermissions(row.Row.Name);
+                            }
+                            <div class="admin-client-text-stack">
+                                <span class="admin-user-meta">@(string.IsNullOrWhiteSpace(row.Row.Description) ? "—" : row.Row.Description)</span>
+                                <details class="admin-details-inline">
+                                    <summary>@L["ScopeUsageDetails"]</summary>
+                                    <div class="admin-details-stack">
+                                        <div>
+                                            <strong>@L["UsedByClients"]</strong>
+                                            <div class="admin-token-list">
+                                                @foreach (var client in scopeClients)
+                                                {
+                                                    <span class="admin-token">@client</span>
+                                                }
+                                                @if (scopeClients.Count == 0)
+                                                {
+                                                    <span class="admin-user-meta">@L["NoMatchingClients"]</span>
+                                                }
                                             </div>
-                                        </details>
+                                        </div>
+                                        <div>
+                                            <strong>@L["ReleaseScopeUsage"]</strong>
+                                            <div class="admin-token-list">
+                                                @foreach (var permission in scopePermissions)
+                                                {
+                                                    <span class="admin-token">@permission</span>
+                                                }
+                                                @if (scopePermissions.Count == 0)
+                                                {
+                                                    <span class="admin-user-meta">@L["NoMatchingPermissions"]</span>
+                                                }
+                                            </div>
+                                        </div>
                                     </div>
-                                </td>
-                                <td data-label='@L["Actions"].Value'>
-                                    <div class="admin-actions-column">
-                                        <button type="button"
-                                                class="admin-icon-button"
-                                                title="@L["Edit"]"
-                                                aria-label="@L["Edit"]"
-                                                @onclick:stopPropagation="true"
-                                                @onclick="() => BeginEdit(scope)">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                                <path d="M12 20h9" />
-                                                <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z" />
-                                            </svg>
-                                        </button>
-                                        <button type="button"
-                                                class="admin-icon-button danger"
-                                                title="@L["Delete"]"
-                                                aria-label="@L["Delete"]"
-                                                @onclick:stopPropagation="true"
-                                                @onclick="() => DeleteScopeAsync(scope.Name)"
-                                                disabled="@_isBusy">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                                <path d="M3 6h18" />
-                                                <path d="M8 6V4h8v2" />
-                                                <path d="M19 6l-1 14H6L5 6" />
-                                                <path d="M10 11v6" />
-                                                <path d="M14 11v6" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
+                                </details>
+                            </div>
+                        </Template>
+                    </TableColumn>
+                    <TableColumn Text="@L["Actions"]"
+                                 Filterable="false"
+                                 Searchable="false"
+                                 Sortable="false"
+                                 @bind-Field="scope.ActionKey">
+                        <Template Context="row">
+                            <div class="admin-actions-column">
+                                <button type="button"
+                                        class="admin-icon-button"
+                                        title="@L["Edit"]"
+                                        aria-label="@L["Edit"]"
+                                        @onclick:stopPropagation="true"
+                                        @onclick="() => BeginEdit(row.Row)">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M12 20h9" />
+                                        <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z" />
+                                    </svg>
+                                </button>
+                                <button type="button"
+                                        class="admin-icon-button danger"
+                                        title="@L["Delete"]"
+                                        aria-label="@L["Delete"]"
+                                        @onclick:stopPropagation="true"
+                                        @onclick="() => DeleteScopeAsync(row.Row.Name)"
+                                        disabled="@_isBusy">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M3 6h18" />
+                                        <path d="M8 6V4h8v2" />
+                                        <path d="M19 6l-1 14H6L5 6" />
+                                        <path d="M10 11v6" />
+                                        <path d="M14 11v6" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </Template>
+                    </TableColumn>
+                </TableColumns>
+            </Table>
+        </div>
+
+        <div class="admin-pagination-bar">
+            <span class="admin-pagination-showing">@PageSummary</span>
+
+            <div class="admin-pagination-controls">
+                <label class="admin-page-size-field" for="scope-page-size">
+                    <span>@L["Rows"]</span>
+                    <select id="scope-page-size" class="neo-select admin-page-size-select" value="@_pageSize" @onchange="HandlePageSizeChange">
+                        @foreach (var option in PageSizeOptions)
+                        {
+                            <option value="@option">@option</option>
                         }
-                    }
-                </tbody>
-            </table>
+                    </select>
+                </label>
+
+                <button type="button" class="admin-ghost-button admin-pagination-btn" @onclick="GoToPreviousPage" disabled="@(!CanGoToPreviousPage)">
+                    @L["PreviousPage"]
+                </button>
+                @for (var p = Math.Max(1, _currentPage - 2); p <= Math.Min(TotalPages, _currentPage + 2); p++)
+                {
+                    var pageNum = p;
+                    <button type="button" class="admin-pagination-page-btn @(pageNum == _currentPage ? "is-active" : "")" aria-current="@(pageNum == _currentPage ? "page" : null)" @onclick="() => GoToPage(pageNum)">
+                        @pageNum
+                    </button>
+                }
+                <button type="button" class="admin-ghost-button admin-pagination-btn" @onclick="GoToNextPage" disabled="@(!CanGoToNextPage)">
+                    @L["NextPage"]
+                </button>
+            </div>
         </div>
 
         <ScopeManagementDialog IsOpen="@_isEditorOpen"
@@ -308,24 +361,37 @@ else
 }
 
 @code {
-    private readonly List<OidcScopeResponse> _scopes = [];
-    private readonly List<OidcScopeResponse> _filteredScopes = [];
+    private readonly List<ScopeRow> _scopes = [];
+    private readonly List<ScopeRow> _filteredScopes = [];
+    private readonly List<ScopeRow> _visibleScopes = [];
     private readonly List<OidcClientResponse> _clients = [];
     private readonly List<PermissionDefinitionResponse> _permissionDefinitions = [];
     private readonly List<string> _formErrors = [];
+    private static readonly int[] PageSizeOptions = [10, 20, 50];
 
     private ScopeEditor _editor = new();
     private bool _hasAccess;
     private bool _isBusy;
     private bool _isEditing;
     private bool _isEditorOpen;
+    private int _currentPage = 1;
+    private int _pageSize = 10;
     private string _searchTerm = string.Empty;
     private string? _statusMessage;
     private bool _statusIsError;
+    private Table<ScopeRow>? _table;
 
+    private bool CanGoToNextPage => _currentPage < TotalPages;
+    private bool CanGoToPreviousPage => _currentPage > 1;
     private string FilteredSummary => _filteredScopes.Count == 0
         ? L["SearchResultSummaryEmpty"].Value
         : L["SearchResultSummary", _filteredScopes.Count].Value;
+    private string PageSummary => _filteredScopes.Count == 0
+        ? L["PageSummaryEmpty"].Value
+        : L["PageSummary", PageStartIndex, PageEndIndex, _filteredScopes.Count].Value;
+    private int PageEndIndex => Math.Min(_filteredScopes.Count, ((_currentPage - 1) * _pageSize) + _visibleScopes.Count);
+    private int PageStartIndex => _filteredScopes.Count == 0 ? 0 : ((_currentPage - 1) * _pageSize) + 1;
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(_filteredScopes.Count / (double)_pageSize));
 
     protected override async Task OnInitializedAsync()
     {
@@ -368,12 +434,12 @@ else
         try
         {
             _scopes.Clear();
-            _scopes.AddRange(await ScopeService.GetAllAsync());
+            _scopes.AddRange((await ScopeService.GetAllAsync()).Select(ScopeRow.FromResponse));
             _clients.Clear();
             _clients.AddRange(await ClientService.GetAllAsync());
             _permissionDefinitions.Clear();
             _permissionDefinitions.AddRange((await PermissionCatalogService.GetResourcesAsync()).SelectMany(static resource => resource.Permissions));
-            ApplyFilter();
+            await RefreshScopesAsync(_currentPage);
         }
         finally
         {
@@ -381,22 +447,78 @@ else
         }
     }
 
-    private void ApplyFilter()
+    private Task<QueryData<ScopeRow>> QueryScopesAsync(QueryPageOptions options)
     {
-        _filteredScopes.Clear();
+        _currentPage = Math.Max(1, options.PageIndex);
 
-        IEnumerable<OidcScopeResponse> query = _scopes;
-        if (!string.IsNullOrWhiteSpace(_searchTerm))
+        var filtered = ApplyFilters(options);
+        var sorted = ApplySort(filtered, options.SortName, options.SortOrder).ToList();
+        var totalCount = sorted.Count;
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)_pageSize));
+        if (_currentPage > totalPages)
         {
-            var term = _searchTerm.Trim();
-            query = query.Where(scope =>
-                scope.Name.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                (!string.IsNullOrWhiteSpace(scope.DisplayName) && scope.DisplayName.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
-                (!string.IsNullOrWhiteSpace(scope.Description) && scope.Description.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
-                scope.Resources.Any(resource => resource.Contains(term, StringComparison.OrdinalIgnoreCase)));
+            _currentPage = totalPages;
         }
 
-        _filteredScopes.AddRange(query.OrderBy(static scope => scope.Name, StringComparer.OrdinalIgnoreCase));
+        var visible = sorted
+            .Skip((_currentPage - 1) * _pageSize)
+            .Take(_pageSize)
+            .ToList();
+
+        _filteredScopes.Clear();
+        _filteredScopes.AddRange(sorted);
+        _visibleScopes.Clear();
+        _visibleScopes.AddRange(visible);
+
+        return Task.FromResult(new QueryData<ScopeRow>
+        {
+            Items = visible,
+            TotalCount = totalCount,
+            IsFiltered = true,
+            IsSorted = true,
+            IsSearch = true,
+        });
+    }
+
+    private IEnumerable<ScopeRow> ApplyFilters(QueryPageOptions options)
+    {
+        IEnumerable<ScopeRow> query = _scopes;
+        var searchTerm = _searchTerm.Trim();
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            query = query.Where(scope =>
+                scope.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                (!string.IsNullOrWhiteSpace(scope.DisplayName) && scope.DisplayName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrWhiteSpace(scope.Description) && scope.Description.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
+                scope.Resources.Any(resource => resource.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        var tableFilter = options.Filters.Count > 0
+            ? options.ToFilterFunc<ScopeRow>(StringComparison.OrdinalIgnoreCase)
+            : null;
+        if (tableFilter is not null)
+        {
+            query = query.Where(tableFilter);
+        }
+
+        return query;
+    }
+
+    private static IEnumerable<ScopeRow> ApplySort(IEnumerable<ScopeRow> query, string? sortName, SortOrder sortOrder)
+    {
+        var descending = sortOrder == SortOrder.Desc;
+        return sortName switch
+        {
+            nameof(ScopeRow.DisplayName) => descending
+                ? query.OrderByDescending(static scope => scope.DisplayName ?? scope.Name, StringComparer.OrdinalIgnoreCase)
+                : query.OrderBy(static scope => scope.DisplayName ?? scope.Name, StringComparer.OrdinalIgnoreCase),
+            nameof(ScopeRow.Description) => descending
+                ? query.OrderByDescending(static scope => scope.Description ?? string.Empty, StringComparer.OrdinalIgnoreCase).ThenBy(static scope => scope.Name, StringComparer.OrdinalIgnoreCase)
+                : query.OrderBy(static scope => scope.Description ?? string.Empty, StringComparer.OrdinalIgnoreCase).ThenBy(static scope => scope.Name, StringComparer.OrdinalIgnoreCase),
+            _ => descending
+                ? query.OrderByDescending(static scope => scope.Name, StringComparer.OrdinalIgnoreCase)
+                : query.OrderBy(static scope => scope.Name, StringComparer.OrdinalIgnoreCase),
+        };
     }
 
     private void BeginCreate()
@@ -408,7 +530,7 @@ else
         ClearStatus();
     }
 
-    private void BeginEdit(OidcScopeResponse scope)
+    private void BeginEdit(ScopeRow scope)
     {
         _editor = new ScopeEditor
         {
@@ -584,10 +706,64 @@ else
         _statusIsError = false;
     }
 
-    private void HandleSearchInput(ChangeEventArgs args)
+    private async Task RefreshScopesAsync(int? pageIndex = null)
+    {
+        if (_table is null)
+        {
+            _currentPage = pageIndex ?? _currentPage;
+            await QueryScopesAsync(new QueryPageOptions
+            {
+                PageIndex = _currentPage,
+                PageItems = _pageSize,
+            });
+            StateHasChanged();
+            return;
+        }
+
+        await _table.QueryAsync(pageIndex);
+        StateHasChanged();
+    }
+
+    private async Task HandleSearchInput(ChangeEventArgs args)
     {
         _searchTerm = args.Value?.ToString() ?? string.Empty;
-        ApplyFilter();
+        await RefreshScopesAsync(1);
+    }
+
+    private async Task HandlePageSizeChange(ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), out var pageSize) || pageSize <= 0)
+        {
+            return;
+        }
+
+        _pageSize = pageSize;
+        await RefreshScopesAsync(1);
+    }
+
+    private async Task GoToNextPage()
+    {
+        if (!CanGoToNextPage)
+        {
+            return;
+        }
+
+        await RefreshScopesAsync(_currentPage + 1);
+    }
+
+    private async Task GoToPreviousPage()
+    {
+        if (!CanGoToPreviousPage)
+        {
+            return;
+        }
+
+        await RefreshScopesAsync(_currentPage - 1);
+    }
+
+    private async Task GoToPage(int page)
+    {
+        await RefreshScopesAsync(Math.Clamp(page, 1, TotalPages));
     }
 
     private Task HandleNameChanged(string value)
@@ -681,5 +857,27 @@ else
         public string Description { get; set; } = string.Empty;
         public string ResourcesText { get; set; } = string.Empty;
     }
-}
 
+    private sealed class ScopeRow
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? DisplayName { get; set; }
+        public string? Description { get; set; }
+        public string[] Resources { get; set; } = [];
+        public string ResourcesText { get; set; } = string.Empty;
+        public string ActionKey { get; set; } = string.Empty;
+
+        public static ScopeRow FromResponse(OidcScopeResponse response)
+        {
+            return new ScopeRow
+            {
+                Name = response.Name,
+                DisplayName = response.DisplayName,
+                Description = response.Description,
+                Resources = response.Resources,
+                ResourcesText = string.Join(' ', response.Resources),
+                ActionKey = response.Name,
+            };
+        }
+    }
+}

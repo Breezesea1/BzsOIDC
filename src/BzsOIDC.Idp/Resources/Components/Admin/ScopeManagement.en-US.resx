@@ -55,10 +55,10 @@
     <value>Scope topology overview</value>
   </data>
   <data name="TopologyOverviewLead" xml:space="preserve">
-    <value>Client usage and release-scope references.</value>
+    <value>Global client and permission totals with matching scope highlights.</value>
   </data>
   <data name="ScopeCount" xml:space="preserve">
-    <value>{0} scopes</value>
+    <value>{0} matching scopes</value>
   </data>
   <data name="ClientCount" xml:space="preserve">
     <value>{0} clients</value>
@@ -200,6 +200,24 @@
   </data>
   <data name="UnknownScopeError" xml:space="preserve">
     <value>An unknown scope error occurred.</value>
+  </data>
+  <data name="RowsPerPage" xml:space="preserve">
+    <value>Rows per page</value>
+  </data>
+  <data name="Rows" xml:space="preserve">
+    <value>Rows</value>
+  </data>
+  <data name="PageSummary" xml:space="preserve">
+    <value>Showing {0}-{1} of {2}</value>
+  </data>
+  <data name="PageSummaryEmpty" xml:space="preserve">
+    <value>No rows to display.</value>
+  </data>
+  <data name="PreviousPage" xml:space="preserve">
+    <value>Previous</value>
+  </data>
+  <data name="NextPage" xml:space="preserve">
+    <value>Next</value>
   </data>
   <data name="RequestFailedWithStatus" xml:space="preserve">
     <value>Request failed with status '{0}'.</value>

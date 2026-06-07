@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using BootstrapBlazor.Components;
 using Bunit;
 using BzsOIDC.Idp.Components.Admin;
 using BzsOIDC.Idp.Services.Identity;
@@ -11,6 +12,7 @@ using NSubstitute;
 
 namespace BzsOIDC.Idp.UnitTests.Components.Admin;
 
+[Collection("BootstrapBlazor component tests")]
 public sealed class ScopeManagementPageTests
 {
     [Fact]
@@ -24,21 +26,7 @@ public sealed class ScopeManagementPageTests
             new OidcScopeResponse { Name = "api.write", DisplayName = "Write API", Resources = ["api"] },
         };
 
-        var service = Substitute.For<IOidcScopeService>();
-        service.GetAllAsync(Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<IReadOnlyList<OidcScopeResponse>>(scopes));
-        var clientService = Substitute.For<IOidcClientService>();
-        clientService.GetAllAsync(Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<IReadOnlyList<OidcClientResponse>>([]));
-        var permissionCatalogService = Substitute.For<IPermissionCatalogService>();
-        permissionCatalogService.GetResourcesAsync(Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<IReadOnlyList<ProtectedResourceResponse>>([]));
-
-        context.Services.AddSingleton<IOidcScopeService>(service);
-        context.Services.AddSingleton<IOidcClientService>(clientService);
-        context.Services.AddSingleton<IPermissionCatalogService>(permissionCatalogService);
-        context.Services.AddSingleton<IStringLocalizer<ScopeManagement>, TestStringLocalizer<ScopeManagement>>();
-        context.Services.AddSingleton<IHttpContextAccessor>(CreateAdminHttpContextAccessor());
+        RegisterServices(context, scopes);
 
         var cut = context.Render<ScopeManagement>();
 
@@ -53,6 +41,87 @@ public sealed class ScopeManagementPageTests
         });
     }
 
+    [Fact]
+    public void PageSizeChange_RecomputesVisibleRows_AndNextPageShowsRemainingScopes()
+    {
+        using var context = CreateContext();
+
+        var scopes = Enumerable.Range(1, 22)
+            .Select(index => new OidcScopeResponse
+            {
+                Name = $"api.scope.{index:00}",
+                DisplayName = $"Scope {index:00}",
+                Description = $"Scope description {index:00}",
+                Resources = [$"resource-{index:00}"]
+            })
+            .ToArray();
+
+        RegisterServices(context, scopes);
+
+        var cut = context.Render<ScopeManagement>();
+
+        cut.WaitForAssertion(() => Assert.Equal(10, cut.FindAll("[data-testid='scopes-table'] .table-card > .table-row").Count));
+
+        cut.Find("#scope-page-size").Change("20");
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Equal(20, cut.FindAll("[data-testid='scopes-table'] .table-card > .table-row").Count);
+            Assert.Contains("api.scope.20", cut.Markup, StringComparison.Ordinal);
+        });
+
+        cut.FindAll("button").Single(button => button.TextContent.Contains("NextPage", StringComparison.Ordinal)).Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Equal(2, cut.FindAll("[data-testid='scopes-table'] .table-card > .table-row").Count);
+            Assert.Contains("api.scope.21", cut.Markup, StringComparison.Ordinal);
+            Assert.Contains("api.scope.22", cut.Markup, StringComparison.Ordinal);
+        });
+    }
+
+    [Fact]
+    public void Search_WhenTriggeredFromLaterPage_ResetsToFirstPageAndNoSelectionUiIsRendered()
+    {
+        using var context = CreateContext();
+
+        var scopes = Enumerable.Range(1, 15)
+            .Select(index => new OidcScopeResponse
+            {
+                Name = $"alpha.scope.{index:00}",
+                DisplayName = $"Alpha Scope {index:00}",
+                Resources = ["alpha-resource"]
+            })
+            .Concat(Enumerable.Range(16, 5).Select(index => new OidcScopeResponse
+            {
+                Name = $"beta.scope.{index:00}",
+                DisplayName = $"Beta Scope {index:00}",
+                Resources = ["beta-resource"]
+            }))
+            .ToArray();
+
+        RegisterServices(context, scopes);
+
+        var cut = context.Render<ScopeManagement>();
+
+        cut.WaitForAssertion(() => Assert.Equal(10, cut.FindAll("[data-testid='scopes-table'] .table-card > .table-row").Count));
+        Assert.Empty(cut.FindAll("[data-testid='scopes-table'] input[type='checkbox']"));
+        Assert.DoesNotContain("selection-summary", cut.Markup, StringComparison.OrdinalIgnoreCase);
+
+        cut.FindAll("button").Single(button => button.TextContent.Contains("NextPage", StringComparison.Ordinal)).Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("beta.scope.16", cut.Markup, StringComparison.Ordinal));
+
+        cut.Find("#scope-search").Input("alpha");
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("alpha.scope.01", cut.Markup, StringComparison.Ordinal);
+            Assert.DoesNotContain("alpha.scope.11", cut.Markup, StringComparison.Ordinal);
+            Assert.Equal(10, cut.FindAll("[data-testid='scopes-table'] .table-card > .table-row").Count);
+        });
+    }
+
     private static BunitContext CreateContext()
     {
         var context = new BunitContext();
@@ -60,6 +129,26 @@ public sealed class ScopeManagementPageTests
         context.JSInterop.SetupModule("./Components/Admin/AdminDialogShell.razor.js")
             .SetupVoid("activate", _ => true);
         return context;
+    }
+
+    private static void RegisterServices(BunitContext context, IReadOnlyList<OidcScopeResponse> scopes)
+    {
+        var service = Substitute.For<IOidcScopeService>();
+        service.GetAllAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(scopes));
+        var clientService = Substitute.For<IOidcClientService>();
+        clientService.GetAllAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<OidcClientResponse>>([]));
+        var permissionCatalogService = Substitute.For<IPermissionCatalogService>();
+        permissionCatalogService.GetResourcesAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<ProtectedResourceResponse>>([]));
+
+        context.Services.AddBootstrapBlazor();
+        context.Services.AddSingleton<IOidcScopeService>(service);
+        context.Services.AddSingleton<IOidcClientService>(clientService);
+        context.Services.AddSingleton<IPermissionCatalogService>(permissionCatalogService);
+        context.Services.AddSingleton<IStringLocalizer<ScopeManagement>, TestStringLocalizer<ScopeManagement>>();
+        context.Services.AddSingleton<IHttpContextAccessor>(CreateAdminHttpContextAccessor());
     }
 
     private static IHttpContextAccessor CreateAdminHttpContextAccessor()
@@ -81,4 +170,3 @@ public sealed class ScopeManagementPageTests
         };
     }
 }
-

@@ -55,10 +55,10 @@
     <value>Scope 拓扑概览</value>
   </data>
   <data name="TopologyOverviewLead" xml:space="preserve">
-    <value>客户端使用情况与发布 Scope 引用。</value>
+    <value>展示全局客户端和权限总数，并突出当前匹配的 Scope 关系。</value>
   </data>
   <data name="ScopeCount" xml:space="preserve">
-    <value>{0} 个 Scope</value>
+    <value>{0} 个匹配 Scope</value>
   </data>
   <data name="ClientCount" xml:space="preserve">
     <value>{0} 个客户端</value>
@@ -200,6 +200,24 @@
   </data>
   <data name="UnknownScopeError" xml:space="preserve">
     <value>发生了未知的 Scope 错误。</value>
+  </data>
+  <data name="RowsPerPage" xml:space="preserve">
+    <value>每页行数</value>
+  </data>
+  <data name="Rows" xml:space="preserve">
+    <value>行数</value>
+  </data>
+  <data name="PageSummary" xml:space="preserve">
+    <value>显示第 {0}-{1} 条，共 {2} 条</value>
+  </data>
+  <data name="PageSummaryEmpty" xml:space="preserve">
+    <value>没有可显示的行。</value>
+  </data>
+  <data name="PreviousPage" xml:space="preserve">
+    <value>上一页</value>
+  </data>
+  <data name="NextPage" xml:space="preserve">
+    <value>下一页</value>
   </data>
   <data name="RequestFailedWithStatus" xml:space="preserve">
     <value>请求失败，状态为“{0}”。</value>

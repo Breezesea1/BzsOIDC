@@ -17,10 +17,13 @@ public sealed class AdminExperienceE2ETests(AppHostFixture fixture) : E2EPageTes
         await Expect(Page.Locator("a.sidebar-nav-item[href='/admin/clients']")).ToBeVisibleAsync();
 
         await Page.GotoAsync(fixture.BuildUrl("/admin/users"));
-        await Page.Locator(".admin-table").WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 20000 });
+        await Page.Locator("[data-testid='users-table']").WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 20000 });
 
         await Page.GotoAsync(fixture.BuildUrl("/admin/clients"));
-        await Page.Locator(".admin-table").WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 20000 });
+        await Page.Locator("[data-testid='clients-table']").WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 20000 });
+
+        await Page.GotoAsync(fixture.BuildUrl("/admin/scopes"));
+        await Page.Locator("[data-testid='scopes-table']").WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 20000 });
     }
 
     [Fact]
