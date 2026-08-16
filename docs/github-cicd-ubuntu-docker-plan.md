@@ -165,7 +165,7 @@
 6. `dotnet format BzsOIDC.sln --verify-no-changes --verbosity minimal`
 7. `dotnet test BzsOIDC.sln -c Release`
 8. 构建 `BzsOIDC.Idp` 容器镜像
-9. 若为 `main` 分支，则推送到 GHCR
+9. `main` 推送发布 `edge` 快照；`X.Y.Z` tag 推送发布稳定版本到 GHCR
 
 ### 2. `deploy.yml`
 
@@ -217,17 +217,15 @@
 
 ### 标签策略
 
-不要只使用 `latest`，应同时打：
+稳定版本由无前缀的 `X.Y.Z` Git tag 触发，例如 `1.2.3`。CI 会校验三个数字段，并为两个镜像同时发布：
 
-- `latest`
-- `sha-<commit>`
+- `1.2.3`：不可变的完整发布版本，生产部署首选
+- `1.2`：同一 minor 系列的最新版本
+- `1`：同一 major 系列的最新版本
+- `latest`：最新稳定版本
+- `sha-<commit>`：精确提交版本
 
-例如：
-
-- `ghcr.io/<owner>/bzsoidc-idp:latest`
-- `ghcr.io/<owner>/bzsoidc-idp:sha-abc1234`
-
-部署时优先使用 `sha-*`，这样可以明确回滚到某个发布版本。
+普通 `main` 推送只发布 `edge` 和 `sha-<commit>`，不会覆盖 `latest`。这样开发快照与稳定发布不会混用。
 
 ---
 
@@ -310,7 +308,7 @@
 部署时：
 
 ```bash
-docker run --rm ... bzsoidc-idp-migrator:sha-xxxx
+docker run --rm ... bzsoidc-idp-migrator:1.2.3
 ```
 
 ### 方式 B：Compose 中定义 service，但不常驻
@@ -336,15 +334,17 @@ docker compose up -d idp
 
 推荐的完整发布流程如下：
 
-1. GitHub Actions 构建并推送 `idp` 镜像
-2. GitHub Actions 构建并推送 `idp-migrator` 镜像
-3. SSH 进入 Ubuntu 服务器
-4. 登录 GHCR
-5. `docker compose pull`
-6. `docker compose run --rm idp-migrator`
-7. 如果 migrator 成功，执行 `docker compose up -d idp`
-8. 检查应用是否健康可用
-9. 清理悬空镜像
+1. 创建并推送严格的 `X.Y.Z` Git tag
+2. GitHub Actions 完成构建、测试和启动检查
+3. GitHub Actions 构建并推送 `idp` 镜像
+4. GitHub Actions 构建并推送 `idp-migrator` 镜像
+5. SSH 进入 Ubuntu 服务器
+6. 登录 GHCR
+7. 将 `IMAGE_TAG` 设置为完整版本号并执行 `docker compose pull`
+8. `docker compose run --rm idp-migrator`
+9. 如果 migrator 成功，执行 `docker compose up -d idp`
+10. 检查应用是否健康可用
+11. 清理悬空镜像
 
 ### 成功判定
 
@@ -363,7 +363,7 @@ docker compose up -d idp
 
 ### 最低要求
 
-- 每次部署都保留一个不可变 tag，例如 `sha-xxxx`
+- 每次部署都固定到完整的 `X.Y.Z` tag；`sha-<commit>` 作为精确提交的备用定位方式
 - 服务器上始终记录当前版本和上一个版本
 
 ### 回滚方式

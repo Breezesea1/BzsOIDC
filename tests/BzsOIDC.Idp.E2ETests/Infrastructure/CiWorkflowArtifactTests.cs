@@ -1,5 +1,6 @@
 namespace BzsOIDC.Idp.E2ETests.Infrastructure;
 
+[Trait("Category", "Smoke")]
 public sealed class CiWorkflowArtifactTests
 {
     [Fact]
@@ -20,7 +21,7 @@ public sealed class CiWorkflowArtifactTests
     }
 
     [Fact]
-    public void FullE2EJob_RunsOnWorkflowDispatchAndMainPush()
+    public void FullE2EJob_WhenDispatchedOrStableRefIsPushed_Runs()
     {
         var workflowPath = ResolveWorkflowPath();
         var workflow = File.ReadAllText(workflowPath);
@@ -36,6 +37,58 @@ public sealed class CiWorkflowArtifactTests
         Assert.Contains("github.event_name == 'workflow_dispatch'", jobBlock, StringComparison.Ordinal);
         Assert.Contains("github.event_name == 'push'", jobBlock, StringComparison.Ordinal);
         Assert.Contains("github.ref == 'refs/heads/main'", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("startsWith(github.ref, 'refs/tags/')", jobBlock, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ResolveVersionJob_WhenTagIsPushed_RequiresStrictUnprefixedSemanticVersion()
+    {
+        var workflow = File.ReadAllText(ResolveWorkflowPath());
+
+        var jobStart = workflow.IndexOf("  resolve-version:", StringComparison.Ordinal);
+        Assert.True(jobStart >= 0, "The CI workflow must define the version resolution job.");
+
+        var nextJobStart = workflow.IndexOf("  build-test:", jobStart, StringComparison.Ordinal);
+        Assert.True(nextJobStart > jobStart, "The version resolution job should appear before the build job.");
+
+        var jobBlock = workflow[jobStart..nextJobStart];
+
+        Assert.Contains("tags:", workflow, StringComparison.Ordinal);
+        Assert.Contains("- \"*.*.*\"", workflow, StringComparison.Ordinal);
+        Assert.Contains("${GITHUB_EVENT_NAME}\" == \"push", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("${GITHUB_REF_TYPE}\" == \"tag", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("0.0.0-ci.${GITHUB_RUN_NUMBER}", jobBlock, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ContainerImages_WhenSemanticVersionTagIsValid_PublishesVersionHierarchyAndBuildMetadata()
+    {
+        var workflow = File.ReadAllText(ResolveWorkflowPath());
+
+        var jobStart = workflow.IndexOf("  container-images:", StringComparison.Ordinal);
+        Assert.True(jobStart >= 0, "The CI workflow must define the container image job.");
+
+        var jobBlock = workflow[jobStart..];
+
+        Assert.Contains("needs.e2e-smoke.result == 'success'", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("needs.app-startup.result == 'success'", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("needs.e2e-full.result == 'success'", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("needs.resolve-version.outputs.is-release", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("bzsoidc-idp:sha-${GITHUB_SHA}", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("bzsoidc-idp-migrator:sha-${GITHUB_SHA}", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("bzsoidc-idp:${version}", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("bzsoidc-idp:${major}.${minor}", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("bzsoidc-idp:${major}", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("bzsoidc-idp:latest", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("bzsoidc-idp:edge", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("bzsoidc-idp-migrator:${version}", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("bzsoidc-idp-migrator:${major}.${minor}", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("bzsoidc-idp-migrator:${major}", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("bzsoidc-idp-migrator:latest", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("bzsoidc-idp-migrator:edge", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("VERSION=${{ needs.resolve-version.outputs.version }}", jobBlock, StringComparison.Ordinal);
+        Assert.Contains("VCS_REF=${{ github.sha }}", jobBlock, StringComparison.Ordinal);
     }
 
     private static string ResolveWorkflowPath()

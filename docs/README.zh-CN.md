@@ -138,3 +138,14 @@ dotnet test tests/BzsOIDC.Idp.E2ETests/BzsOIDC.Idp.E2ETests.csproj --filter "Ful
 ## 部署说明
 
 当前仓库更偏向使用 Aspire 进行本地开发编排。已提交的 `docs/github-cicd-ubuntu-docker-plan.md` 建议在生产环境中部署 `BzsOIDC.Idp` 与 `BzsOIDC.Idp.Migrator`，而不是直接把 AppHost 原样搬到生产环境。
+
+## 版本发布
+
+稳定版本使用无前缀的 `X.Y.Z` Git tag，例如 `1.2.3`。三个数字段必须采用规范写法，因此 CI 会拒绝 `v1.2.3`、`01.2.3` 等标签。
+
+```bash
+git tag -a 1.2.3 -m "Release 1.2.3"
+git push origin 1.2.3
+```
+
+构建、测试和启动检查全部通过后，CI 会为两套 GHCR 镜像发布 `1.2.3`、`1.2`、`1`、`latest` 和 `sha-<commit>` 标签。普通 `main` 推送只发布 `edge` 与 `sha-<commit>`。生产部署应把 `IMAGE_TAG` 固定为完整且不可变的版本号，例如 `1.2.3`。

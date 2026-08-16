@@ -25,13 +25,15 @@ BzsOIDC/
 - Frontend assets live in `src/BzsOIDC.Idp/` and use Tailwind CLI + GSAP copy script
 
 ## 2. Rule files
-Present: `AGENTS.md`
+Present:
+- `AGENTS.md`
+- `Directory.Build.props` defines the local fallback application version; release CI overrides it from an `X.Y.Z` Git tag.
+
 Not present when checked:
 - `.cursorrules`
 - `.cursor/rules/`
 - `.github/copilot-instructions.md`
 - `.editorconfig`
-- `Directory.Build.props`
 If any of those files are added later, update this document.
 
 ## 3. Standard commands

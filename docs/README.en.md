@@ -138,3 +138,14 @@ Local E2E execution depends on the `aspire` CLI being installed and available on
 ## Notes for deployment
 
 The current repository is optimized for local development with Aspire. The checked-in docs under `docs/github-cicd-ubuntu-docker-plan.md` recommend deploying the web app and migrator as production services rather than moving the AppHost directly into production.
+
+## Versioned releases
+
+Stable releases use an unprefixed `X.Y.Z` Git tag such as `1.2.3`. Each numeric component must be canonical, so tags such as `v1.2.3` and `01.2.3` are rejected by CI.
+
+```bash
+git tag -a 1.2.3 -m "Release 1.2.3"
+git push origin 1.2.3
+```
+
+After all build, test, and startup jobs pass, CI publishes both GHCR images with `1.2.3`, `1.2`, `1`, `latest`, and `sha-<commit>` tags. A normal `main` push publishes only `edge` and `sha-<commit>`. Production deployments should pin `IMAGE_TAG` to the full immutable version, for example `1.2.3`.

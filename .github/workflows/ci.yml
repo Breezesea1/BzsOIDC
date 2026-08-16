@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "*.*.*"
   pull_request:
     branches:
       - main
@@ -28,9 +30,39 @@ env:
   E2E_STARTUP_FILTER: Category=Startup
 
 jobs:
+  resolve-version:
+    name: Resolve build version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-release: ${{ steps.version.outputs.is-release }}
+
+    steps:
+      - name: Resolve semantic version
+        id: version
+        shell: bash
+        run: |
+          version="0.0.0-ci.${GITHUB_RUN_NUMBER}"
+          is_release="false"
+
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            if [[ ! "${GITHUB_REF_NAME}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+              echo "Release tags must use strict X.Y.Z semantic versioning without a prefix (for example, 1.2.3)." >&2
+              exit 1
+            fi
+
+            version="${GITHUB_REF_NAME}"
+            is_release="true"
+          fi
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "is-release=${is_release}" >> "$GITHUB_OUTPUT"
+          echo "### Build version: ${version}" >> "$GITHUB_STEP_SUMMARY"
+
   build-test:
     name: Build, format, and test
     runs-on: ubuntu-latest
+    needs: resolve-version
 
     steps:
       - name: Checkout
@@ -64,7 +96,7 @@ jobs:
         run: dotnet restore BzsOIDC.sln
 
       - name: Build solution
-        run: dotnet build BzsOIDC.sln -c Release --no-restore
+        run: dotnet build BzsOIDC.sln -c Release --no-restore -p:Version=${{ needs.resolve-version.outputs.version }}
 
       - name: Verify formatting
         run: dotnet format BzsOIDC.sln --verify-no-changes --verbosity minimal
@@ -146,7 +178,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-test
     timeout-minutes: 30
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
 
     steps:
       - name: Checkout
@@ -192,7 +224,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-test
     timeout-minutes: 45
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')))
 
     steps:
       - name: Checkout
@@ -236,7 +268,18 @@ jobs:
     name: Build container images
     runs-on: ubuntu-latest
     needs:
+      - resolve-version
       - build-test
+      - e2e-smoke
+      - app-startup
+      - e2e-full
+    if: >-
+      always() &&
+      needs.resolve-version.result == 'success' &&
+      needs.build-test.result == 'success' &&
+      (needs.e2e-smoke.result == 'success' || needs.e2e-smoke.result == 'skipped') &&
+      (needs.app-startup.result == 'success' || needs.app-startup.result == 'skipped') &&
+      (needs.e2e-full.result == 'success' || needs.e2e-full.result == 'skipped')
 
     steps:
       - name: Checkout
@@ -250,17 +293,32 @@ jobs:
         shell: bash
         run: |
           owner="${GITHUB_REPOSITORY_OWNER,,}"
+          version="${{ needs.resolve-version.outputs.version }}"
           idp_sha="ghcr.io/${owner}/bzsoidc-idp:sha-${GITHUB_SHA}"
           migrator_sha="ghcr.io/${owner}/bzsoidc-idp-migrator:sha-${GITHUB_SHA}"
 
-          echo "publish=false" >> "$GITHUB_OUTPUT"
-          echo "idp_tags=${idp_sha}" >> "$GITHUB_OUTPUT"
-          echo "migrator_tags=${migrator_sha}" >> "$GITHUB_OUTPUT"
+          {
+            echo "publish=false"
+            echo "idp_tags=${idp_sha}"
+            echo "migrator_tags=${migrator_sha}"
+          } >> "$GITHUB_OUTPUT"
 
           if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" == "refs/heads/main" ]]; then
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-            echo "idp_tags=${idp_sha},ghcr.io/${owner}/bzsoidc-idp:latest" >> "$GITHUB_OUTPUT"
-            echo "migrator_tags=${migrator_sha},ghcr.io/${owner}/bzsoidc-idp-migrator:latest" >> "$GITHUB_OUTPUT"
+            {
+              echo "publish=true"
+              echo "idp_tags=${idp_sha},ghcr.io/${owner}/bzsoidc-idp:edge"
+              echo "migrator_tags=${migrator_sha},ghcr.io/${owner}/bzsoidc-idp-migrator:edge"
+            } >> "$GITHUB_OUTPUT"
+          elif [[ "${{ needs.resolve-version.outputs.is-release }}" == "true" ]]; then
+            major="${version%%.*}"
+            remainder="${version#*.}"
+            minor="${remainder%%.*}"
+
+            {
+              echo "publish=true"
+              echo "idp_tags=${idp_sha},ghcr.io/${owner}/bzsoidc-idp:${version},ghcr.io/${owner}/bzsoidc-idp:${major}.${minor},ghcr.io/${owner}/bzsoidc-idp:${major},ghcr.io/${owner}/bzsoidc-idp:latest"
+              echo "migrator_tags=${migrator_sha},ghcr.io/${owner}/bzsoidc-idp-migrator:${version},ghcr.io/${owner}/bzsoidc-idp-migrator:${major}.${minor},ghcr.io/${owner}/bzsoidc-idp-migrator:${major},ghcr.io/${owner}/bzsoidc-idp-migrator:latest"
+            } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Log in to GHCR
@@ -278,6 +336,9 @@ jobs:
           file: src/BzsOIDC.Idp/Dockerfile
           push: ${{ steps.image-metadata.outputs.publish == 'true' }}
           tags: ${{ steps.image-metadata.outputs.idp_tags }}
+          build-args: |
+            VERSION=${{ needs.resolve-version.outputs.version }}
+            VCS_REF=${{ github.sha }}
           provenance: false
 
       - name: Build migrator image
@@ -287,6 +348,9 @@ jobs:
           file: src/BzsOIDC.Idp.Migrator/Dockerfile
           push: ${{ steps.image-metadata.outputs.publish == 'true' }}
           tags: ${{ steps.image-metadata.outputs.migrator_tags }}
+          build-args: |
+            VERSION=${{ needs.resolve-version.outputs.version }}
+            VCS_REF=${{ github.sha }}
           provenance: false
 
       - name: Summarize image output
@@ -299,7 +363,7 @@ jobs:
             echo "- Migrator tags: ${{ steps.image-metadata.outputs.migrator_tags }}"
             echo
             if [[ "${{ steps.image-metadata.outputs.publish }}" == "true" ]]; then
-              echo "Published to GHCR from main push."
+              echo "Published to GHCR from a main push or a semantic-version release tag."
               echo "Packages usually appear under https://github.com/users/${GITHUB_REPOSITORY_OWNER}/packages or the organization packages page."
             else
               echo "Built for validation only. This run did not push images because it was not a push to main."

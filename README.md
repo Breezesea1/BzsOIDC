@@ -157,6 +157,17 @@ dotnet test tests/BzsOIDC.Idp.E2ETests/BzsOIDC.Idp.E2ETests.csproj
 - `deploy/.env.example`
 - `deploy/deploy.sh`
 
+## 版本与镜像发布
+
+正式版本使用无前缀的 `X.Y.Z` Git tag，例如 `1.2.3`。tag 必须是三个不带前导零的数字段，不接受 `v1.2.3`。
+
+```bash
+git tag -a 1.2.3 -m "Release 1.2.3"
+git push origin 1.2.3
+```
+
+CI 会先完成构建、测试和启动检查，再发布两套 GHCR 镜像。正式版本同时生成 `1.2.3`、`1.2`、`1`、`latest` 和 `sha-<commit>` 标签；普通 `main` 推送只更新 `edge` 和 `sha-<commit>`。生产部署应将 `IMAGE_TAG` 固定为完整版本号，例如 `1.2.3`。
+
 如果你需要更详细的部署与文档说明，可以继续看：
 
 - [docs/README.zh-CN.md](./docs/README.zh-CN.md)
