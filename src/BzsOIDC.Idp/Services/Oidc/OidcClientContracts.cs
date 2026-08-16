@@ -1,7 +1,13 @@
 using BzsOIDC.Shared.Infrastructure.Authorization;
-using OpenIddict.Abstractions;
 
 namespace BzsOIDC.Idp.Services.Oidc;
+
+public static class OidcGrantTypes
+{
+    public const string AuthorizationCode = "authorization_code";
+    public const string RefreshToken = "refresh_token";
+    public const string ClientCredentials = "client_credentials";
+}
 
 public sealed class OidcClientUpsertRequest
 {
@@ -12,7 +18,7 @@ public sealed class OidcClientUpsertRequest
     public bool PublicClient { get; init; }
     public bool RequireProofKeyForCodeExchange { get; init; } = true;
     public OidcClientConsentType? ConsentType { get; init; }
-    public string[] GrantTypes { get; init; } = [OpenIddictConstants.GrantTypes.AuthorizationCode];
+    public string[] GrantTypes { get; init; } = [OidcGrantTypes.AuthorizationCode];
     public string[] Scopes { get; init; } = [PermissionConstants.ScopeApi];
     public string[] RedirectUris { get; init; } = [];
     public string[] PostLogoutRedirectUris { get; init; } = [];

@@ -6,9 +6,9 @@
 @using BootstrapBlazor.Components
 @using Microsoft.AspNetCore.WebUtilities
 @using Microsoft.Extensions.Localization
-@using OpenIddict.Abstractions
 @inject IHttpContextAccessor HttpContextAccessor
 @inject IOidcClientService ClientService
+@inject IOidcClientProfile ClientProfile
 @inject IOidcScopeService ScopeService
 @inject IStringLocalizer<ClientManagement> L
 @inject NavigationManager NavigationManager
@@ -112,7 +112,7 @@ else
         <div class="admin-table-shell admin-bootstrap-table" data-testid="clients-table">
             <Table TItem="ClientRow"
                    @ref="_table"
-                   PageItems="@_pageSize"
+                   PageItems="@PageSize"
                    PageItemsSource="PageSizeOptions"
                    IsPagination="false"
                    AllowResizing="true"
@@ -277,7 +277,7 @@ else
             <div class="admin-pagination-controls">
                 <label class="admin-page-size-field" for="client-page-size">
                     <span>@L["Rows"]</span>
-                    <select id="client-page-size" class="neo-select admin-page-size-select" value="@_pageSize" @onchange="HandlePageSizeChange">
+                    <select id="client-page-size" class="neo-select admin-page-size-select" value="@PageSize" @onchange="HandlePageSizeChange">
                         @foreach (var option in PageSizeOptions)
                         {
                             <option value="@option">@option</option>
@@ -288,10 +288,10 @@ else
                 <button type="button" class="admin-ghost-button admin-pagination-btn" @onclick="GoToPreviousPage" disabled="@(!CanGoToPreviousPage)">
                     @L["PreviousPage"]
                 </button>
-                @for (var p = Math.Max(1, _currentPage - 2); p <= Math.Min(TotalPages, _currentPage + 2); p++)
+                @for (var p = Math.Max(1, CurrentPage - 2); p <= Math.Min(TotalPages, CurrentPage + 2); p++)
                 {
                     var pageNum = p;
-                    <button type="button" class="admin-pagination-page-btn @(pageNum == _currentPage ? "is-active" : "")" aria-current="@(pageNum == _currentPage ? "page" : null)" @onclick="() => GoToPage(pageNum)">
+                    <button type="button" class="admin-pagination-page-btn @(pageNum == CurrentPage ? "is-active" : "")" aria-current="@(pageNum == CurrentPage ? "page" : null)" @onclick="() => GoToPage(pageNum)">
                         @pageNum
                     </button>
                 }
@@ -330,19 +330,16 @@ else
 
 @code {
     private readonly List<ClientRow> _clients = [];
-    private readonly List<ClientRow> _filteredClients = [];
     private readonly List<string> _availableScopes = [];
-    private readonly List<ClientRow> _visibleClients = [];
     private readonly List<string> _formErrors = [];
+    private readonly AdminCollection<ClientRow, string> _collection = new(static client => client.ClientId);
     private static readonly int[] PageSizeOptions = [10, 20, 50];
 
-    private ClientEditor _editor = CreateDefaultEditor();
+    private ClientEditor _editor = new();
     private bool _hasAccess;
     private bool _isBusy;
     private bool _isEditing;
     private bool _isEditorOpen;
-    private int _currentPage = 1;
-    private int _pageSize = 10;
     private string _searchTerm = string.Empty;
     private OidcClientAuthFlow? _authFlowFilter;
     private string? _generatedClientSecret;
@@ -352,17 +349,17 @@ else
 
     private int AuthorizationCodeCount => _clients.Count(static client => client.AuthFlow == OidcClientAuthFlow.AuthorizationCode);
     private int ClientCredentialsCount => _clients.Count(static client => client.AuthFlow == OidcClientAuthFlow.ClientCredentials);
-    private bool CanGoToNextPage => _currentPage < TotalPages;
-    private bool CanGoToPreviousPage => _currentPage > 1;
-    private string FilteredSummary => _filteredClients.Count == 0
+    private int CurrentPage => _collection.CurrentPage;
+    private int PageSize => _collection.PageSize;
+    private bool CanGoToNextPage => CurrentPage < TotalPages;
+    private bool CanGoToPreviousPage => CurrentPage > 1;
+    private string FilteredSummary => _collection.TotalCount == 0
         ? L["SearchResultSummaryEmpty"].Value
-        : L["SearchResultSummary", _filteredClients.Count].Value;
-    private string PageSummary => _filteredClients.Count == 0
+        : L["SearchResultSummary", _collection.TotalCount].Value;
+    private string PageSummary => _collection.TotalCount == 0
         ? L["PageSummaryEmpty"].Value
-        : L["PageSummary", PageStartIndex, PageEndIndex, _filteredClients.Count].Value;
-    private int PageEndIndex => Math.Min(_filteredClients.Count, ((_currentPage - 1) * _pageSize) + _visibleClients.Count);
-    private int PageStartIndex => _filteredClients.Count == 0 ? 0 : ((_currentPage - 1) * _pageSize) + 1;
-    private int TotalPages => Math.Max(1, (int)Math.Ceiling(_filteredClients.Count / (double)_pageSize));
+        : L["PageSummary", _collection.PageStartIndex, _collection.PageEndIndex, _collection.TotalCount].Value;
+    private int TotalPages => _collection.TotalPages;
 
     protected override async Task OnInitializedAsync()
     {
@@ -409,7 +406,8 @@ else
             _availableScopes.Clear();
             _availableScopes.AddRange((await ScopeService.GetAllAsync()).Select(static scope => scope.Name));
             _availableScopes.Sort(StringComparer.OrdinalIgnoreCase);
-            await RefreshClientsAsync(_currentPage);
+            _collection.ReplaceRows(_clients);
+            await RefreshClientsAsync(CurrentPage);
         }
         finally
         {
@@ -419,77 +417,45 @@ else
 
     private Task<QueryData<ClientRow>> QueryClientsAsync(QueryPageOptions options)
     {
-        _currentPage = Math.Max(1, options.PageIndex);
-
-        var filtered = ApplyFilters(options);
-        var sorted = ApplySort(filtered, options.SortName, options.SortOrder).ToList();
-        var totalCount = sorted.Count;
-        var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)_pageSize));
-        if (_currentPage > totalPages)
-        {
-            _currentPage = totalPages;
-        }
-
-        var visible = sorted
-            .Skip((_currentPage - 1) * _pageSize)
-            .Take(_pageSize)
-            .ToList();
-
-        _filteredClients.Clear();
-        _filteredClients.AddRange(sorted);
-        _visibleClients.Clear();
-        _visibleClients.AddRange(visible);
+        var result = _collection.Query(CreateCollectionQuery(options));
 
         return Task.FromResult(new QueryData<ClientRow>
         {
-            Items = visible,
-            TotalCount = totalCount,
+            Items = result.Items,
+            TotalCount = result.TotalCount,
             IsFiltered = true,
             IsSorted = true,
             IsSearch = true,
         });
     }
 
-    private IEnumerable<ClientRow> ApplyFilters(QueryPageOptions options)
+    private AdminCollectionQuery<ClientRow> CreateCollectionQuery(QueryPageOptions options)
     {
-        IEnumerable<ClientRow> query = _clients;
-
-        if (_authFlowFilter.HasValue)
-        {
-            query = query.Where(client => client.AuthFlow == _authFlowFilter.Value);
-        }
-
         var searchTerm = _searchTerm.Trim();
-        if (!string.IsNullOrWhiteSpace(searchTerm))
-        {
-            query = query
-                .Select(client => new
-                {
-                    Client = client,
-                    Score = AdminTableSearch.Score(
-                        searchTerm,
-                        client.ClientId,
-                        client.DisplayName,
-                        FormatAuthFlow(client.AuthFlow),
-                        FormatConsentType(client.ConsentType),
-                        client.GrantTypesText,
-                        client.ScopesText,
-                        client.RedirectUrisText)
-                })
-                .Where(static result => result.Score.HasValue)
-                .OrderBy(static result => result.Score)
-                .Select(static result => result.Client);
-        }
-
         var tableFilter = options.Filters.Count > 0
             ? options.ToFilterFunc<ClientRow>(StringComparison.OrdinalIgnoreCase)
             : null;
-        if (tableFilter is not null)
-        {
-            query = query.Where(tableFilter);
-        }
 
-        return query;
+        return new AdminCollectionQuery<ClientRow>(
+            options.PageIndex,
+            PageSize,
+            options.SortName,
+            options.SortOrder == SortOrder.Desc,
+            client =>
+                (!_authFlowFilter.HasValue || client.AuthFlow == _authFlowFilter.Value) &&
+                (tableFilter is null || tableFilter(client)),
+            string.IsNullOrWhiteSpace(searchTerm)
+                ? null
+                : client => AdminTableSearch.Score(
+                    searchTerm,
+                    client.ClientId,
+                    client.DisplayName,
+                    FormatAuthFlow(client.AuthFlow),
+                    FormatConsentType(client.ConsentType),
+                    client.GrantTypesText,
+                    client.ScopesText,
+                    client.RedirectUrisText),
+            (rows, sortName, descending) => ApplySort(rows, sortName, descending ? SortOrder.Desc : SortOrder.Asc));
     }
 
     private static IEnumerable<ClientRow> ApplySort(IEnumerable<ClientRow> query, string? sortName, SortOrder sortOrder)
@@ -672,37 +638,17 @@ else
 
     private OidcClientUpsertRequest BuildRequest()
     {
-        var scopes = ParseLines(_editor.ScopesText);
-
-        if (_editor.AuthFlow == OidcClientAuthFlow.AuthorizationCode)
-        {
-            return new OidcClientUpsertRequest
-            {
-                ClientId = string.IsNullOrWhiteSpace(_editor.ClientId) ? null : _editor.ClientId.Trim(),
-                DisplayName = _editor.DisplayName.Trim(),
-                AuthFlow = OidcClientAuthFlow.AuthorizationCode,
-                PublicClient = true,
-                RequireProofKeyForCodeExchange = true,
-                ConsentType = _editor.ConsentType,
-                GrantTypes = [OpenIddictConstants.GrantTypes.AuthorizationCode, OpenIddictConstants.GrantTypes.RefreshToken],
-                Scopes = scopes,
-                RedirectUris = ParseLines(_editor.RedirectUrisText),
-                PostLogoutRedirectUris = ParseLines(_editor.PostLogoutRedirectUrisText),
-            };
-        }
-
-        return new OidcClientUpsertRequest
+        return ClientProfile.CreateRequest(new OidcClientProfileDraft
         {
             ClientId = string.IsNullOrWhiteSpace(_editor.ClientId) ? null : _editor.ClientId.Trim(),
             ClientSecret = string.IsNullOrWhiteSpace(_editor.ClientSecret) ? null : _editor.ClientSecret.Trim(),
             DisplayName = _editor.DisplayName.Trim(),
-            AuthFlow = OidcClientAuthFlow.ClientCredentials,
-            PublicClient = false,
-            RequireProofKeyForCodeExchange = false,
-            ConsentType = OidcClientConsentType.External,
-            GrantTypes = [OpenIddictConstants.GrantTypes.ClientCredentials],
-            Scopes = scopes,
-        };
+            AuthFlow = _editor.AuthFlow,
+            ConsentType = _editor.ConsentType,
+            Scopes = ParseLines(_editor.ScopesText),
+            RedirectUris = ParseLines(_editor.RedirectUrisText),
+            PostLogoutRedirectUris = ParseLines(_editor.PostLogoutRedirectUrisText),
+        });
     }
 
     private void AddCommandErrors<T>(OidcClientCommandResult<T> result)
@@ -822,11 +768,12 @@ else
         return Math.Max(0, values.Count - 2);
     }
 
-    private static ClientEditor CreateDefaultEditor()
+    private ClientEditor CreateDefaultEditor()
     {
         return new ClientEditor
         {
             AuthFlow = OidcClientAuthFlow.AuthorizationCode,
+            ConsentType = ClientProfile.GetDefaultConsentType(OidcClientAuthFlow.AuthorizationCode),
             ScopesText = PermissionConstants.ScopeApi,
         };
     }
@@ -848,11 +795,10 @@ else
     {
         if (_table is null)
         {
-            _currentPage = pageIndex ?? _currentPage;
             await QueryClientsAsync(new QueryPageOptions
             {
-                PageIndex = _currentPage,
-                PageItems = _pageSize,
+                PageIndex = pageIndex ?? CurrentPage,
+                PageItems = PageSize,
             });
             StateHasChanged();
             return;
@@ -875,7 +821,7 @@ else
             return;
         }
 
-        _pageSize = pageSize;
+        _collection.SetPageSize(pageSize);
         await RefreshClientsAsync(1);
     }
 
@@ -886,7 +832,7 @@ else
             return;
         }
 
-        await RefreshClientsAsync(_currentPage + 1);
+        await RefreshClientsAsync(CurrentPage + 1);
     }
 
     private async Task GoToPreviousPage()
@@ -896,7 +842,7 @@ else
             return;
         }
 
-        await RefreshClientsAsync(_currentPage - 1);
+        await RefreshClientsAsync(CurrentPage - 1);
     }
 
     private async Task GoToPage(int page)
@@ -931,14 +877,14 @@ else
             _editor.ClientSecret = string.Empty;
             if (_editor.ConsentType == OidcClientConsentType.External)
             {
-                _editor.ConsentType = OidcClientConsentType.Implicit;
+                _editor.ConsentType = ClientProfile.GetDefaultConsentType(value);
             }
         }
         else
         {
             _editor.RedirectUrisText = string.Empty;
             _editor.PostLogoutRedirectUrisText = string.Empty;
-            _editor.ConsentType = OidcClientConsentType.External;
+            _editor.ConsentType = ClientProfile.GetDefaultConsentType(value);
         }
 
         return Task.CompletedTask;

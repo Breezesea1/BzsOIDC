@@ -18,37 +18,14 @@ public sealed class OidcTopologyPageTests
     {
         using var context = CreateContext();
 
-        var clientService = Substitute.For<IOidcClientService>();
-        clientService.GetAllAsync(Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<IReadOnlyList<OidcClientResponse>>([
-                new OidcClientResponse
-                {
-                    ClientId = "client-1",
-                    DisplayName = "Client 1",
-                    AuthFlow = OidcClientAuthFlow.AuthorizationCode,
-                    Scopes = ["api"],
-                },
-            ]));
+        var topology = Substitute.For<IOidcAdministrationTopology>();
+        topology.ReadAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new OidcAdministrationTopologySnapshot(
+                [new OidcAdministrationClient("client-1", "Client 1", OidcClientAuthFlow.AuthorizationCode, ["api"])],
+                [new OidcAdministrationScope("api", "API", null, ["resource"], ["Client 1"], ["clients.read"])],
+                1)));
 
-        var scopeService = Substitute.For<IOidcScopeService>();
-        scopeService.GetAllAsync(Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<IReadOnlyList<OidcScopeResponse>>([
-                new OidcScopeResponse { Name = "api", DisplayName = "API", Resources = ["resource"] },
-            ]));
-
-        var permissionCatalogService = Substitute.For<IPermissionCatalogService>();
-        permissionCatalogService.GetResourcesAsync(Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<IReadOnlyList<ProtectedResourceResponse>>([
-                new ProtectedResourceResponse
-                {
-                    Key = "api",
-                    Permissions = [new PermissionDefinitionResponse { Name = "clients.read", ReleaseScopes = ["api"] }],
-                },
-            ]));
-
-        context.Services.AddSingleton<IOidcClientService>(clientService);
-        context.Services.AddSingleton<IOidcScopeService>(scopeService);
-        context.Services.AddSingleton<IPermissionCatalogService>(permissionCatalogService);
+        context.Services.AddSingleton<IOidcAdministrationTopology>(topology);
         context.Services.AddSingleton<IStringLocalizer<ScopeManagement>, TestStringLocalizer<ScopeManagement>>();
         context.Services.AddSingleton<IHttpContextAccessor>(CreateAdminHttpContextAccessor());
 

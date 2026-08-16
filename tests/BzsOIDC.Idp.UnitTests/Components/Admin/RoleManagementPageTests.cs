@@ -18,13 +18,13 @@ public sealed class RoleManagementPageTests
         using var context = CreateContext();
         var adminRoleId = Guid.Parse("00000000-0000-0000-0000-000000000001");
         var operatorRoleId = Guid.Parse("00000000-0000-0000-0000-000000000002");
-        var roleService = Substitute.For<IRoleManagementService>();
-        roleService.GetAllAsync(Arg.Any<CancellationToken>())
+        var roleService = Substitute.For<IPermissionTopology>();
+        roleService.GetAllRolesAsync(Arg.Any<CancellationToken>())
             .Returns([
                 new RoleResponse { Id = adminRoleId, Name = "admin", IsProtected = true, PermissionCount = 1 },
                 new RoleResponse { Id = operatorRoleId, Name = "operators", PermissionCount = 0 },
             ]);
-        roleService.GetByIdAsync(adminRoleId, Arg.Any<CancellationToken>())
+        roleService.GetRoleByIdAsync(adminRoleId, Arg.Any<CancellationToken>())
             .Returns(new RoleResponse
             {
                 Id = adminRoleId,
@@ -33,9 +33,7 @@ public sealed class RoleManagementPageTests
                 PermissionCount = 1,
                 Permissions = ["users.read.all"],
             });
-
-        var catalogService = Substitute.For<IPermissionCatalogService>();
-        catalogService.GetResourcesAsync(Arg.Any<CancellationToken>())
+        roleService.GetResourcesAsync(Arg.Any<CancellationToken>())
             .Returns([
                 new ProtectedResourceResponse
                 {
@@ -62,7 +60,6 @@ public sealed class RoleManagementPageTests
             ]);
 
         context.Services.AddSingleton(roleService);
-        context.Services.AddSingleton(catalogService);
         context.Services.AddSingleton<IStringLocalizer<RoleManagement>, TestStringLocalizer<RoleManagement>>();
         context.Services.AddSingleton<IHttpContextAccessor>(CreateAdminHttpContextAccessor());
 
@@ -83,21 +80,18 @@ public sealed class RoleManagementPageTests
     {
         using var context = CreateContext();
         var adminRoleId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-        var roleService = Substitute.For<IRoleManagementService>();
-        roleService.GetAllAsync(Arg.Any<CancellationToken>())
+        var roleService = Substitute.For<IPermissionTopology>();
+        roleService.GetAllRolesAsync(Arg.Any<CancellationToken>())
             .Returns([
                 new RoleResponse { Id = adminRoleId, Name = "admin", IsProtected = true },
                 new RoleResponse { Id = Guid.NewGuid(), Name = "operators" },
             ]);
-        roleService.GetByIdAsync(adminRoleId, Arg.Any<CancellationToken>())
+        roleService.GetRoleByIdAsync(adminRoleId, Arg.Any<CancellationToken>())
             .Returns(new RoleResponse { Id = adminRoleId, Name = "admin", IsProtected = true });
-
-        var catalogService = Substitute.For<IPermissionCatalogService>();
-        catalogService.GetResourcesAsync(Arg.Any<CancellationToken>())
+        roleService.GetResourcesAsync(Arg.Any<CancellationToken>())
             .Returns([]);
 
         context.Services.AddSingleton(roleService);
-        context.Services.AddSingleton(catalogService);
         context.Services.AddSingleton<IStringLocalizer<RoleManagement>, TestStringLocalizer<RoleManagement>>();
         context.Services.AddSingleton<IHttpContextAccessor>(CreateAdminHttpContextAccessor());
 
@@ -111,20 +105,18 @@ public sealed class RoleManagementPageTests
     }
 
     [Fact]
-    public void SavePermissions_WhenSelectedPermission_CallsRoleManagementServiceWithSnapshot()
+    public void SavePermissions_WhenSelectedPermission_CallsPermissionTopologyWithSnapshot()
     {
         using var context = CreateContext();
         var roleId = Guid.Parse("00000000-0000-0000-0000-000000000002");
-        var roleService = Substitute.For<IRoleManagementService>();
-        roleService.GetAllAsync(Arg.Any<CancellationToken>())
+        var roleService = Substitute.For<IPermissionTopology>();
+        roleService.GetAllRolesAsync(Arg.Any<CancellationToken>())
             .Returns([new RoleResponse { Id = roleId, Name = "operators" }]);
-        roleService.GetByIdAsync(roleId, Arg.Any<CancellationToken>())
+        roleService.GetRoleByIdAsync(roleId, Arg.Any<CancellationToken>())
             .Returns(new RoleResponse { Id = roleId, Name = "operators", Permissions = [] });
-        roleService.SyncPermissionsAsync(roleId, Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
-            .Returns(RoleManagementCommandResult<IReadOnlyList<string>>.Success(["roles.write"]));
-
-        var catalogService = Substitute.For<IPermissionCatalogService>();
-        catalogService.GetResourcesAsync(Arg.Any<CancellationToken>())
+        roleService.SyncRolePermissionsAsync(roleId, Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(PermissionTopologyCommandResult<IReadOnlyList<string>>.Success(["roles.write"]));
+        roleService.GetResourcesAsync(Arg.Any<CancellationToken>())
             .Returns([
                 new ProtectedResourceResponse
             {
@@ -144,15 +136,14 @@ public sealed class RoleManagementPageTests
             ]);
 
         IReadOnlyList<string>? capturedPermissions = null;
-        roleService.SyncPermissionsAsync(roleId, Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+        roleService.SyncRolePermissionsAsync(roleId, Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
                 capturedPermissions = callInfo.ArgAt<IEnumerable<string>>(1).ToArray();
-                return RoleManagementCommandResult<IReadOnlyList<string>>.Success(["roles.write"]);
+                return PermissionTopologyCommandResult<IReadOnlyList<string>>.Success(["roles.write"]);
             });
 
         context.Services.AddSingleton(roleService);
-        context.Services.AddSingleton(catalogService);
         context.Services.AddSingleton<IStringLocalizer<RoleManagement>, TestStringLocalizer<RoleManagement>>();
         context.Services.AddSingleton<IHttpContextAccessor>(CreateAdminHttpContextAccessor());
 
@@ -164,7 +155,7 @@ public sealed class RoleManagementPageTests
 
         Assert.NotNull(capturedPermissions);
         Assert.Equal(["roles.write"], capturedPermissions);
-        roleService.Received(1).SyncPermissionsAsync(roleId, Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>());
+        roleService.Received(1).SyncRolePermissionsAsync(roleId, Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>());
     }
 
     private static BunitContext CreateContext()

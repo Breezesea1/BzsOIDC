@@ -5,13 +5,13 @@ using NSubstitute;
 
 namespace BzsOIDC.Idp.UnitTests.Controllers;
 
-public sealed class PermissionCatalogControllerTests
+public sealed class PermissionTopologyControllerTests
 {
     [Fact]
     public async Task GetResource_WhenResourceKeyEmpty_ReturnsValidationProblem()
     {
-        var service = Substitute.For<IPermissionCatalogService>();
-        var sut = new PermissionCatalogController(service, Substitute.For<IRoleManagementService>());
+        var service = Substitute.For<IPermissionTopology>();
+        var sut = new PermissionTopologyController(service);
 
         var result = await sut.GetResource(" ", CancellationToken.None);
 
@@ -22,10 +22,10 @@ public sealed class PermissionCatalogControllerTests
     [Fact]
     public async Task GetResource_WhenResourceNotFound_ReturnsNotFound()
     {
-        var service = Substitute.For<IPermissionCatalogService>();
+        var service = Substitute.For<IPermissionTopology>();
         service.GetResourceAsync("orders-api", Arg.Any<CancellationToken>())
             .Returns((ProtectedResourceResponse?)null);
-        var sut = new PermissionCatalogController(service, Substitute.For<IRoleManagementService>());
+        var sut = new PermissionTopologyController(service);
 
         var result = await sut.GetResource("orders-api", CancellationToken.None);
 
@@ -35,12 +35,12 @@ public sealed class PermissionCatalogControllerTests
     [Fact]
     public async Task SyncReleaseScopes_WhenScopesEmpty_ReturnsValidationProblem()
     {
-        var service = Substitute.For<IPermissionCatalogService>();
+        var service = Substitute.For<IPermissionTopology>();
         service.SyncReleaseScopesAsync("orders.read", Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
-            .Returns(PermissionCatalogCommandResult<PermissionDefinitionResponse>.Failure(
-                PermissionCatalogCommandStatus.ValidationFailed,
+            .Returns(PermissionTopologyCommandResult<PermissionDefinitionResponse>.Failure(
+                PermissionTopologyCommandStatus.ValidationFailed,
                 "At least one release scope is required."));
-        var sut = new PermissionCatalogController(service, Substitute.For<IRoleManagementService>());
+        var sut = new PermissionTopologyController(service);
 
         var result = await sut.SyncReleaseScopes(
             "orders.read",
@@ -54,7 +54,7 @@ public sealed class PermissionCatalogControllerTests
     [Fact]
     public async Task UpsertPermission_WhenValidRequest_ReturnsUpdatedPermission()
     {
-        var service = Substitute.For<IPermissionCatalogService>();
+        var service = Substitute.For<IPermissionTopology>();
         var updated = new PermissionDefinitionResponse
         {
             ResourceKey = "orders-api",
@@ -63,9 +63,9 @@ public sealed class PermissionCatalogControllerTests
         };
 
         service.UpsertPermissionAsync("orders-api", "orders.read", Arg.Any<PermissionDefinitionUpsertRequest>(), Arg.Any<CancellationToken>())
-            .Returns(PermissionCatalogCommandResult<PermissionDefinitionResponse>.Success(updated));
+            .Returns(PermissionTopologyCommandResult<PermissionDefinitionResponse>.Success(updated));
 
-        var sut = new PermissionCatalogController(service, Substitute.For<IRoleManagementService>());
+        var sut = new PermissionTopologyController(service);
         var request = new PermissionDefinitionUpsertRequest { DisplayName = "Read orders" };
 
         var result = await sut.UpsertPermission("orders-api", "orders.read", request, CancellationToken.None);
@@ -78,13 +78,12 @@ public sealed class PermissionCatalogControllerTests
     [Fact]
     public async Task SyncRolePermissions_WhenServiceFails_ReturnsValidationProblem()
     {
-        var service = Substitute.For<IPermissionCatalogService>();
-        var roleManagementService = Substitute.For<IRoleManagementService>();
-        roleManagementService.SyncPermissionsAsync(Arg.Any<Guid>(), Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
-            .Returns(RoleManagementCommandResult<IReadOnlyList<string>>.Failure(
-                RoleManagementCommandStatus.ValidationFailed,
+        var service = Substitute.For<IPermissionTopology>();
+        service.SyncRolePermissionsAsync(Arg.Any<Guid>(), Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(PermissionTopologyCommandResult<IReadOnlyList<string>>.Failure(
+                PermissionTopologyCommandStatus.ValidationFailed,
                 "Permission is invalid."));
-        var sut = new PermissionCatalogController(service, roleManagementService);
+        var sut = new PermissionTopologyController(service);
 
         var result = await sut.SyncRolePermissions(Guid.NewGuid(), new RolePermissionSyncRequest
         {
@@ -94,14 +93,30 @@ public sealed class PermissionCatalogControllerTests
         var objectResult = Assert.IsType<ObjectResult>(result);
         Assert.IsType<ValidationProblemDetails>(objectResult.Value);
     }
+
+    [Fact]
+    public async Task SyncRolePermissions_WhenRoleMissing_ReturnsNotFound()
+    {
+        var service = Substitute.For<IPermissionTopology>();
+        service.SyncRolePermissionsAsync(Arg.Any<Guid>(), Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(PermissionTopologyCommandResult<IReadOnlyList<string>>.Failure(PermissionTopologyCommandStatus.NotFound));
+        var sut = new PermissionTopologyController(service);
+
+        var result = await sut.SyncRolePermissions(Guid.NewGuid(), new RolePermissionSyncRequest
+        {
+            Permissions = ["missing.permission"],
+        }, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
     [Fact]
     public async Task GetRolePermissions_WhenRoleExists_ReturnsPermissions()
     {
-        var service = Substitute.For<IPermissionCatalogService>();
-        var roleManagementService = Substitute.For<IRoleManagementService>();
-        roleManagementService.GetPermissionsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+        var service = Substitute.For<IPermissionTopology>();
+        service.GetRolePermissionsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(["users.read.all"]);
-        var sut = new PermissionCatalogController(service, roleManagementService);
+        var sut = new PermissionTopologyController(service);
 
         var result = await sut.GetRolePermissions(Guid.NewGuid(), CancellationToken.None);
 
@@ -113,11 +128,10 @@ public sealed class PermissionCatalogControllerTests
     [Fact]
     public async Task GetRolePermissions_WhenRoleMissing_ReturnsNotFound()
     {
-        var service = Substitute.For<IPermissionCatalogService>();
-        var roleManagementService = Substitute.For<IRoleManagementService>();
-        roleManagementService.GetPermissionsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+        var service = Substitute.For<IPermissionTopology>();
+        service.GetRolePermissionsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns((IReadOnlyList<string>?)null);
-        var sut = new PermissionCatalogController(service, roleManagementService);
+        var sut = new PermissionTopologyController(service);
 
         var result = await sut.GetRolePermissions(Guid.NewGuid(), CancellationToken.None);
 
@@ -127,11 +141,10 @@ public sealed class PermissionCatalogControllerTests
     [Fact]
     public async Task SyncRolePermissions_WhenServiceSucceeds_ReturnsNoContent()
     {
-        var service = Substitute.For<IPermissionCatalogService>();
-        var roleManagementService = Substitute.For<IRoleManagementService>();
-        roleManagementService.SyncPermissionsAsync(Arg.Any<Guid>(), Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
-            .Returns(RoleManagementCommandResult<IReadOnlyList<string>>.Success(["users.read.all"]));
-        var sut = new PermissionCatalogController(service, roleManagementService);
+        var service = Substitute.For<IPermissionTopology>();
+        service.SyncRolePermissionsAsync(Arg.Any<Guid>(), Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(PermissionTopologyCommandResult<IReadOnlyList<string>>.Success(["users.read.all"]));
+        var sut = new PermissionTopologyController(service);
 
         var result = await sut.SyncRolePermissions(Guid.NewGuid(), new RolePermissionSyncRequest
         {

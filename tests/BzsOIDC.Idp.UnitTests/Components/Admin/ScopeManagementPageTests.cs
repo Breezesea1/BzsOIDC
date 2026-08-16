@@ -16,7 +16,7 @@ namespace BzsOIDC.Idp.UnitTests.Components.Admin;
 public sealed class ScopeManagementPageTests
 {
     [Fact]
-    public void SearchInput_FiltersMatchingScopes()
+    public void SearchInput_WhenTermMatchesOneScope_FiltersMatchingScopes()
     {
         using var context = CreateContext();
 
@@ -134,19 +134,22 @@ public sealed class ScopeManagementPageTests
     private static void RegisterServices(BunitContext context, IReadOnlyList<OidcScopeResponse> scopes)
     {
         var service = Substitute.For<IOidcScopeService>();
-        service.GetAllAsync(Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(scopes));
-        var clientService = Substitute.For<IOidcClientService>();
-        clientService.GetAllAsync(Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<IReadOnlyList<OidcClientResponse>>([]));
-        var permissionCatalogService = Substitute.For<IPermissionCatalogService>();
-        permissionCatalogService.GetResourcesAsync(Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<IReadOnlyList<ProtectedResourceResponse>>([]));
+        var topology = Substitute.For<IOidcAdministrationTopology>();
+        topology.ReadAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new OidcAdministrationTopologySnapshot(
+                [],
+                scopes.Select(static scope => new OidcAdministrationScope(
+                    scope.Name,
+                    scope.DisplayName,
+                    scope.Description,
+                    scope.Resources,
+                    [],
+                    [])).ToArray(),
+                0)));
 
         context.Services.AddBootstrapBlazor();
         context.Services.AddSingleton<IOidcScopeService>(service);
-        context.Services.AddSingleton<IOidcClientService>(clientService);
-        context.Services.AddSingleton<IPermissionCatalogService>(permissionCatalogService);
+        context.Services.AddSingleton<IOidcAdministrationTopology>(topology);
         context.Services.AddSingleton<IStringLocalizer<ScopeManagement>, TestStringLocalizer<ScopeManagement>>();
         context.Services.AddSingleton<IHttpContextAccessor>(CreateAdminHttpContextAccessor());
     }

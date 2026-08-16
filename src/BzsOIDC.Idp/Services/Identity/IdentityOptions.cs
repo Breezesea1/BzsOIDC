@@ -17,7 +17,8 @@ public sealed class IdentitySeedOptions
             [IdentitySeedConstants.UserRoleName] = [PermissionConstants.UsersReadSelf],
         };
 
-    public PermissionCatalogSeedResource[] PermissionCatalog { get; init; } =
+    // Preserve the existing configuration key while using topology terminology in code.
+    public PermissionTopologySeedResource[] PermissionCatalog { get; init; } =
     [
         new()
         {

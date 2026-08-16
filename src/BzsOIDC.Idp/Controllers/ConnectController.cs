@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Security.Claims;
 using BzsOIDC.Idp.Models;
 using BzsOIDC.Idp.Services.Oidc;
@@ -19,11 +18,11 @@ public sealed class ConnectController(
     SignInManager<BzsUser> signInManager,
     UserManager<BzsUser> userManager,
     IOpenIddictApplicationManager applicationManager,
-    IOpenIddictAuthorizationManager authorizationManager,
     IAntiforgery antiforgery,
     IOidcConsentPageRenderer consentPageRenderer,
-    IPermissionCatalogService permissionCatalogService,
-    IOidcPrincipalFactory oidcPrincipalFactory) : ControllerBase
+    IPermissionTopology permissionTopology,
+    IOidcPrincipalFactory oidcPrincipalFactory,
+    IOidcConsentLifecycle consentLifecycle) : ControllerBase
 {
     /// <summary>
     /// 处理授权流程。
@@ -71,15 +70,24 @@ public sealed class ConnectController(
         var principal = await oidcPrincipalFactory.CreateUserPrincipalAsync(user);
         var scopes = oidcPrincipalFactory.FilterRequestedScopes(request.GetScopes()).ToArray();
         principal.SetScopes(scopes);
-        await PermissionClaimDestinationsHandler.ApplyDestinationsAsync(principal, permissionCatalogService, cancellationToken);
+        await PermissionClaimDestinationsHandler.ApplyDestinationsAsync(principal, permissionTopology, cancellationToken);
 
-        var consentOutcome = await TryApplyConsentAsync(request, user, principal, scopes, cancellationToken);
-        if (consentOutcome == OidcConsentOutcome.Authorized)
+        var subject = principal.GetClaim(OpenIddictConstants.Claims.Subject) ?? await userManager.GetUserIdAsync(user);
+        var consentResult = await consentLifecycle.EvaluateAsync(
+            new OidcConsentRequest(
+                request.ClientId,
+                subject,
+                scopes,
+                request.HasPromptValue("consent"),
+                request.HasPromptValue("none")),
+            cancellationToken);
+        if (consentResult.Outcome == OidcConsentOutcome.Authorized)
         {
+            AttachAuthorizationId(principal, consentResult.AuthorizationId);
             return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
 
-        if (consentOutcome == OidcConsentOutcome.ConsentRequired)
+        if (consentResult.Outcome == OidcConsentOutcome.ConsentRequired)
         {
             return Forbid(
                 new AuthenticationProperties(new Dictionary<string, string?>
@@ -105,7 +113,10 @@ public sealed class ConnectController(
 
             if (string.Equals(Request.Form["consent"], "accept", StringComparison.OrdinalIgnoreCase))
             {
-                await CreateAndAttachAuthorizationAsync(request, user, principal, scopes, cancellationToken);
+                var creationResult = await consentLifecycle.CreatePermanentAuthorizationAsync(
+                    new OidcConsentAuthorizationRequest(request.ClientId, subject, scopes, principal),
+                    cancellationToken);
+                AttachAuthorizationId(principal, creationResult.AuthorizationId);
                 return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
             }
         }
@@ -160,7 +171,7 @@ public sealed class ConnectController(
                 refreshedPrincipal.SetAuthorizationId(authorizationId);
             }
 
-            await PermissionClaimDestinationsHandler.ApplyDestinationsAsync(refreshedPrincipal, permissionCatalogService,
+            await PermissionClaimDestinationsHandler.ApplyDestinationsAsync(refreshedPrincipal, permissionTopology,
                 cancellationToken);
 
             return SignIn(refreshedPrincipal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
@@ -182,7 +193,7 @@ public sealed class ConnectController(
             var displayName = await applicationManager.GetDisplayNameAsync(application, cancellationToken);
             var principal = oidcPrincipalFactory.CreateClientPrincipal(request.ClientId, displayName);
             principal.SetScopes(oidcPrincipalFactory.FilterRequestedScopes(request.GetScopes()));
-            await PermissionClaimDestinationsHandler.ApplyDestinationsAsync(principal, permissionCatalogService,
+            await PermissionClaimDestinationsHandler.ApplyDestinationsAsync(principal, permissionTopology,
                 cancellationToken);
 
             return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
@@ -294,100 +305,8 @@ public sealed class ConnectController(
         }
     }
 
-    private async Task<OidcConsentOutcome> TryApplyConsentAsync(
-        OpenIddictRequest request,
-        BzsUser user,
-        ClaimsPrincipal principal,
-        IReadOnlyList<string> scopes,
-        CancellationToken cancellationToken)
+    private static void AttachAuthorizationId(ClaimsPrincipal principal, string? authorizationId)
     {
-        if (string.IsNullOrWhiteSpace(request.ClientId))
-        {
-            return OidcConsentOutcome.Authorized;
-        }
-
-        var application = await applicationManager.FindByClientIdAsync(request.ClientId, cancellationToken);
-        if (application is null)
-        {
-            return OidcConsentOutcome.Authorized;
-        }
-
-        if (request.HasPromptValue("consent"))
-        {
-            return OidcConsentOutcome.ConsentPageRequired;
-        }
-
-        var consentType = await applicationManager.GetConsentTypeAsync(application, cancellationToken);
-        if (!string.Equals(consentType, OpenIddictConstants.ConsentTypes.Explicit, StringComparison.OrdinalIgnoreCase))
-        {
-            return OidcConsentOutcome.Authorized;
-        }
-
-        var applicationId = await applicationManager.GetIdAsync(application, cancellationToken);
-        if (string.IsNullOrWhiteSpace(applicationId))
-        {
-            return OidcConsentOutcome.Authorized;
-        }
-
-        var subject = await userManager.GetUserIdAsync(user);
-        var authorizations = authorizationManager.FindAsync(
-            subject,
-            applicationId,
-            OpenIddictConstants.Statuses.Valid,
-            OpenIddictConstants.AuthorizationTypes.Permanent,
-            // Consent is intentionally scope-specific: expanding requested scopes must prompt again.
-            scopes.ToImmutableArray(),
-            cancellationToken);
-
-        await foreach (var authorization in authorizations)
-        {
-            var authorizationId = await authorizationManager.GetIdAsync(authorization, cancellationToken);
-            if (!string.IsNullOrWhiteSpace(authorizationId))
-            {
-                principal.SetAuthorizationId(authorizationId);
-                return OidcConsentOutcome.Authorized;
-            }
-        }
-
-        return request.HasPromptValue("none")
-            ? OidcConsentOutcome.ConsentRequired
-            : OidcConsentOutcome.ConsentPageRequired;
-    }
-
-    private async Task CreateAndAttachAuthorizationAsync(
-        OpenIddictRequest request,
-        BzsUser user,
-        ClaimsPrincipal principal,
-        IReadOnlyList<string> scopes,
-        CancellationToken cancellationToken)
-    {
-        var application = string.IsNullOrWhiteSpace(request.ClientId)
-            ? null
-            : await applicationManager.FindByClientIdAsync(request.ClientId, cancellationToken);
-
-        var applicationId = application is null
-            ? null
-            : await applicationManager.GetIdAsync(application, cancellationToken);
-
-        if (string.IsNullOrWhiteSpace(applicationId))
-        {
-            throw new InvalidOperationException("An explicit consent authorization requires a valid OIDC application.");
-        }
-
-        var descriptor = new OpenIddictAuthorizationDescriptor
-        {
-            ApplicationId = applicationId,
-            Principal = principal,
-            Status = OpenIddictConstants.Statuses.Valid,
-            Subject = await userManager.GetUserIdAsync(user),
-            Type = OpenIddictConstants.AuthorizationTypes.Permanent,
-        };
-
-        descriptor.Scopes.UnionWith(scopes);
-
-        var authorization = await authorizationManager.CreateAsync(descriptor, cancellationToken);
-
-        var authorizationId = await authorizationManager.GetIdAsync(authorization, cancellationToken);
         if (!string.IsNullOrWhiteSpace(authorizationId))
         {
             principal.SetAuthorizationId(authorizationId);
@@ -410,12 +329,5 @@ public sealed class ConnectController(
         }
 
         return request.ClientId ?? "the client";
-    }
-
-    private enum OidcConsentOutcome
-    {
-        Authorized,
-        ConsentPageRequired,
-        ConsentRequired,
     }
 }

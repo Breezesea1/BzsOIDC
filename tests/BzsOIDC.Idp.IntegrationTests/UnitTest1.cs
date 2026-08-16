@@ -23,7 +23,7 @@ using Microsoft.Extensions.Options;
 
 namespace BzsOIDC.Idp.IntegrationTests;
 
-public sealed class PermissionCatalogApiIntegrationTests : IAsyncLifetime
+public sealed class PermissionTopologyApiIntegrationTests : IAsyncLifetime
 {
     private SqliteConnection _connection = null!;
     private WebApplication _app = null!;
@@ -40,7 +40,7 @@ public sealed class PermissionCatalogApiIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PermissionCatalog_WithValidPermissionClaims_WorksEndToEnd()
+    public async Task PermissionTopology_WhenLegacyRouteHasValidClaims_WorksEndToEnd()
     {
         using var resourceRequest = CreateAuthorizedRequest(
             HttpMethod.Put,
@@ -162,13 +162,12 @@ public sealed class PermissionCatalogApiIntegrationTests : IAsyncLifetime
             .AddRoles<BzsRole>()
             .AddEntityFrameworkStores<IdpDbContext>()
             .AddDefaultTokenProviders();
-        builder.Services.AddScoped<IPermissionCatalogService, PermissionCatalogService>();
         builder.Services.AddScoped<RoleManagementPolicy>();
-        builder.Services.AddScoped<IRoleManagementService, RoleManagementService>();
+        builder.Services.AddScoped<IPermissionTopology, PermissionTopologyService>();
 
         builder.Services
             .AddControllers()
-            .AddApplicationPart(typeof(PermissionCatalogController).Assembly);
+            .AddApplicationPart(typeof(PermissionTopologyController).Assembly);
 
         _app = builder.Build();
         _app.UseAuthentication();
@@ -197,20 +196,20 @@ public sealed class PermissionCatalogApiIntegrationTests : IAsyncLifetime
     private async Task SeedPermissionAsync(string permissionName)
     {
         await using var scope = _app.Services.CreateAsyncScope();
-        var catalogService = scope.ServiceProvider.GetRequiredService<IPermissionCatalogService>();
-        var resourceResult = await catalogService.UpsertResourceAsync(
+        var permissionTopology = scope.ServiceProvider.GetRequiredService<IPermissionTopology>();
+        var resourceResult = await permissionTopology.UpsertResourceAsync(
             PermissionConstants.ScopeApi,
             new ProtectedResourceUpsertRequest { DisplayName = "BzsOIDC Admin API" });
-        Assert.Equal(PermissionCatalogCommandStatus.Success, resourceResult.Status);
+        Assert.Equal(PermissionTopologyCommandStatus.Success, resourceResult.Status);
 
-        var permissionResult = await catalogService.UpsertPermissionAsync(
+        var permissionResult = await permissionTopology.UpsertPermissionAsync(
             PermissionConstants.ScopeApi,
             permissionName,
             new PermissionDefinitionUpsertRequest { DisplayName = permissionName });
-        Assert.Equal(PermissionCatalogCommandStatus.Success, permissionResult.Status);
+        Assert.Equal(PermissionTopologyCommandStatus.Success, permissionResult.Status);
 
-        var scopeResult = await catalogService.SyncReleaseScopesAsync(permissionName, [PermissionConstants.ScopeApi]);
-        Assert.Equal(PermissionCatalogCommandStatus.Success, scopeResult.Status);
+        var scopeResult = await permissionTopology.SyncReleaseScopesAsync(permissionName, [PermissionConstants.ScopeApi]);
+        Assert.Equal(PermissionTopologyCommandStatus.Success, scopeResult.Status);
     }
 
     private static HttpRequestMessage CreateAuthorizedRequest(

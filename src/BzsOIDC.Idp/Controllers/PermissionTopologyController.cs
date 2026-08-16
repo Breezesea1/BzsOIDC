@@ -5,15 +5,15 @@ using Microsoft.AspNetCore.Mvc;
 namespace BzsOIDC.Idp.Controllers;
 
 [ApiController]
-public sealed class PermissionCatalogController(
-    IPermissionCatalogService permissionCatalogService,
-    IRoleManagementService roleManagementService) : ControllerBase
+public sealed class PermissionTopologyController(
+    IPermissionTopology permissionTopology) : ControllerBase
 {
+    // The permission-catalog route is retained for API compatibility.
     [HttpGet("~/api/permission-catalog/resources")]
     [PermissionAuthorize(PermissionConstants.PermissionsRead)]
     public async Task<ActionResult<IReadOnlyList<ProtectedResourceResponse>>> GetResources(CancellationToken cancellationToken)
     {
-        return Ok(await permissionCatalogService.GetResourcesAsync(cancellationToken));
+        return Ok(await permissionTopology.GetResourcesAsync(cancellationToken));
     }
 
     [HttpGet("~/api/permission-catalog/resources/{resourceKey}")]
@@ -22,11 +22,11 @@ public sealed class PermissionCatalogController(
     {
         if (string.IsNullOrWhiteSpace(resourceKey))
         {
-            ModelState.AddModelError(nameof(resourceKey), "Resource/API key is required.");
+            ModelState.AddModelError(nameof(resourceKey), "Protected resource key is required.");
             return ValidationProblem(ModelState);
         }
 
-        var resource = await permissionCatalogService.GetResourceAsync(resourceKey, cancellationToken);
+        var resource = await permissionTopology.GetResourceAsync(resourceKey, cancellationToken);
         return resource is null ? NotFound() : Ok(resource);
     }
 
@@ -39,11 +39,11 @@ public sealed class PermissionCatalogController(
     {
         if (string.IsNullOrWhiteSpace(resourceKey))
         {
-            ModelState.AddModelError(nameof(resourceKey), "Resource/API key is required.");
+            ModelState.AddModelError(nameof(resourceKey), "Protected resource key is required.");
             return ValidationProblem(ModelState);
         }
 
-        var result = await permissionCatalogService.UpsertResourceAsync(resourceKey, request, cancellationToken);
+        var result = await permissionTopology.UpsertResourceAsync(resourceKey, request, cancellationToken);
         return ToActionResult(result);
     }
 
@@ -57,7 +57,7 @@ public sealed class PermissionCatalogController(
     {
         if (string.IsNullOrWhiteSpace(resourceKey))
         {
-            ModelState.AddModelError(nameof(resourceKey), "Resource/API key is required.");
+            ModelState.AddModelError(nameof(resourceKey), "Protected resource key is required.");
         }
 
         if (string.IsNullOrWhiteSpace(permissionName))
@@ -70,7 +70,7 @@ public sealed class PermissionCatalogController(
             return ValidationProblem(ModelState);
         }
 
-        var result = await permissionCatalogService.UpsertPermissionAsync(resourceKey, permissionName, request, cancellationToken);
+        var result = await permissionTopology.UpsertPermissionAsync(resourceKey, permissionName, request, cancellationToken);
         return ToActionResult(result);
     }
 
@@ -87,7 +87,7 @@ public sealed class PermissionCatalogController(
             return ValidationProblem(ModelState);
         }
 
-        var result = await permissionCatalogService.SyncReleaseScopesAsync(permissionName, request.Scopes, cancellationToken);
+        var result = await permissionTopology.SyncReleaseScopesAsync(permissionName, request.Scopes, cancellationToken);
         return ToActionResult(result);
     }
 
@@ -95,7 +95,7 @@ public sealed class PermissionCatalogController(
     [PermissionAuthorize(PermissionConstants.PermissionsRead)]
     public async Task<ActionResult<IReadOnlyList<string>>> GetRolePermissions(Guid roleId, CancellationToken cancellationToken)
     {
-        var permissions = await roleManagementService.GetPermissionsAsync(roleId, cancellationToken);
+        var permissions = await permissionTopology.GetRolePermissionsAsync(roleId, cancellationToken);
         return permissions is null ? NotFound() : Ok(permissions);
     }
 
@@ -106,13 +106,13 @@ public sealed class PermissionCatalogController(
         [FromBody] RolePermissionSyncRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await roleManagementService.SyncPermissionsAsync(roleId, request.Permissions, cancellationToken);
-        if (result.Status == RoleManagementCommandStatus.Success)
+        var result = await permissionTopology.SyncRolePermissionsAsync(roleId, request.Permissions, cancellationToken);
+        if (result.Status == PermissionTopologyCommandStatus.Success)
         {
             return NoContent();
         }
 
-        if (result.Status == RoleManagementCommandStatus.NotFound)
+        if (result.Status == PermissionTopologyCommandStatus.NotFound)
         {
             return NotFound();
         }
@@ -125,15 +125,15 @@ public sealed class PermissionCatalogController(
         return ValidationProblem(ModelState);
     }
 
-    private ActionResult<T> ToActionResult<T>(PermissionCatalogCommandResult<T> result)
+    private ActionResult<T> ToActionResult<T>(PermissionTopologyCommandResult<T> result)
     {
         return result.Status switch
         {
-            PermissionCatalogCommandStatus.Success => Ok(result.Value),
-            PermissionCatalogCommandStatus.NotFound => NotFound(),
-            PermissionCatalogCommandStatus.Conflict => Conflict(result.Errors.FirstOrDefault()),
-            PermissionCatalogCommandStatus.ValidationFailed => ValidationProblem(CreateValidationProblem(result.Errors)),
-            _ => Problem("Unexpected permission catalog command status."),
+            PermissionTopologyCommandStatus.Success => Ok(result.Value),
+            PermissionTopologyCommandStatus.NotFound => NotFound(),
+            PermissionTopologyCommandStatus.Conflict => Conflict(result.Errors.FirstOrDefault()),
+            PermissionTopologyCommandStatus.ValidationFailed => ValidationProblem(CreateValidationProblem(result.Errors)),
+            _ => Problem("Unexpected permission topology command status."),
         };
     }
 
@@ -141,7 +141,7 @@ public sealed class PermissionCatalogController(
     {
         foreach (var error in errors)
         {
-            ModelState.AddModelError(nameof(PermissionCatalogController), error);
+            ModelState.AddModelError(nameof(PermissionTopologyController), error);
         }
 
         return new ValidationProblemDetails(ModelState);

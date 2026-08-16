@@ -89,4 +89,5 @@
   <data name="EmailMustBeValid" xml:space="preserve"><value>邮箱必须是有效地址。</value></data>
   <data name="CannotRemoveCurrentSessionAdminAccess" xml:space="preserve"><value>不能移除当前会话所使用账号的管理员权限。</value></data>
   <data name="SavedUserCouldNotBeReloaded" xml:space="preserve"><value>无法从数据库重新加载刚保存的用户。</value></data>
+  <data name="IdentityOperationFailed" xml:space="preserve"><value>无法完成用户操作。</value></data>
 </root>

@@ -13,11 +13,11 @@ namespace BzsOIDC.Idp.UnitTests.Components.Admin;
 public sealed class PermissionManagementPageTests
 {
     [Fact]
-    public void Render_WhenCatalogHasData_ShowsPermissionCenterSections()
+    public void Render_WhenTopologyHasData_ShowsPermissionCenterSections()
     {
         using var context = CreateContext();
-        var catalogService = Substitute.For<IPermissionCatalogService>();
-        catalogService.GetResourcesAsync(Arg.Any<CancellationToken>())
+        var permissionTopology = Substitute.For<IPermissionTopology>();
+        permissionTopology.GetResourcesAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<IReadOnlyList<ProtectedResourceResponse>>([
                 new ProtectedResourceResponse
                 {
@@ -46,7 +46,7 @@ public sealed class PermissionManagementPageTests
                 },
             ]));
 
-        context.Services.AddSingleton(catalogService);
+        context.Services.AddSingleton(permissionTopology);
         context.Services.AddSingleton<IStringLocalizer<PermissionManagement>, TestStringLocalizer<PermissionManagement>>();
         context.Services.AddSingleton<IHttpContextAccessor>(CreateAdminHttpContextAccessor());
 

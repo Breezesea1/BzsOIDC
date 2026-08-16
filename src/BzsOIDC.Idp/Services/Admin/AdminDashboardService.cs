@@ -1,7 +1,5 @@
-using BzsOIDC.Idp.Models;
 using BzsOIDC.Idp.Services.Identity;
 using BzsOIDC.Idp.Services.Oidc;
-using Microsoft.AspNetCore.Identity;
 
 namespace BzsOIDC.Idp.Services.Admin;
 
@@ -23,26 +21,17 @@ public sealed class AdminDashboardSummaryResponse
 }
 
 internal sealed class AdminDashboardService(
-    IUserService userService,
+    IUserAdministration userAdministration,
     IOidcClientService clientService,
-    IPermissionCatalogService permissionCatalogService,
-    UserManager<BzsUser> userManager) : IAdminDashboardService
+    IPermissionTopology permissionTopology) : IAdminDashboardService
 {
     public async Task<AdminDashboardSummaryResponse> GetSummaryAsync(CancellationToken cancellationToken = default)
     {
-        var users = await userService.GetAllAsync(cancellationToken);
+        var users = await userAdministration.GetUsersAsync(cancellationToken);
         var clients = await clientService.GetAllAsync(cancellationToken);
-        var resources = await permissionCatalogService.GetResourcesAsync(cancellationToken);
+        var resources = await permissionTopology.GetResourcesAsync(cancellationToken);
         var permissions = resources.SelectMany(static resource => resource.Permissions).ToArray();
-
-        var adminUsers = 0;
-        foreach (var user in users)
-        {
-            if (await userManager.IsInRoleAsync(user, IdentitySeedConstants.AdminRoleName))
-            {
-                adminUsers++;
-            }
-        }
+        var adminUsers = users.Count(static user => user.IsAdmin);
 
         return new AdminDashboardSummaryResponse
         {

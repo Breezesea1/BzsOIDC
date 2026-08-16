@@ -12,8 +12,8 @@ public sealed class RolesControllerTests
     [Fact]
     public async Task GetAll_WhenServiceReturnsRoles_ReturnsOkAndRequiresReadPermission()
     {
-        var service = Substitute.For<IRoleManagementService>();
-        service.GetAllAsync(Arg.Any<CancellationToken>())
+        var service = Substitute.For<IPermissionTopology>();
+        service.GetAllRolesAsync(Arg.Any<CancellationToken>())
             .Returns([new RoleResponse { Id = Guid.NewGuid(), Name = "admin" }]);
         var sut = new RolesController(service);
 
@@ -28,8 +28,8 @@ public sealed class RolesControllerTests
     [Fact]
     public async Task GetById_WhenRoleMissing_ReturnsNotFound()
     {
-        var service = Substitute.For<IRoleManagementService>();
-        service.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+        var service = Substitute.For<IPermissionTopology>();
+        service.GetRoleByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns((RoleResponse?)null);
         var sut = new RolesController(service);
 
@@ -42,9 +42,9 @@ public sealed class RolesControllerTests
     public async Task Create_WhenValid_ReturnsCreatedAtActionAndRequiresWritePermission()
     {
         var roleId = Guid.NewGuid();
-        var service = Substitute.For<IRoleManagementService>();
-        service.CreateAsync(Arg.Any<RoleUpsertRequest>(), Arg.Any<CancellationToken>())
-            .Returns(RoleManagementCommandResult<RoleResponse>.Success(new RoleResponse { Id = roleId, Name = "operators" }));
+        var service = Substitute.For<IPermissionTopology>();
+        service.CreateRoleAsync(Arg.Any<RoleUpsertRequest>(), Arg.Any<CancellationToken>())
+            .Returns(PermissionTopologyCommandResult<RoleResponse>.Success(new RoleResponse { Id = roleId, Name = "operators" }));
         var sut = new RolesController(service);
 
         var result = await sut.Create(new RoleUpsertRequest { Name = "operators" }, CancellationToken.None);
@@ -57,10 +57,10 @@ public sealed class RolesControllerTests
     [Fact]
     public async Task Create_WhenValidationFails_ReturnsValidationProblem()
     {
-        var service = Substitute.For<IRoleManagementService>();
-        service.CreateAsync(Arg.Any<RoleUpsertRequest>(), Arg.Any<CancellationToken>())
-            .Returns(RoleManagementCommandResult<RoleResponse>.Failure(
-                RoleManagementCommandStatus.ValidationFailed,
+        var service = Substitute.For<IPermissionTopology>();
+        service.CreateRoleAsync(Arg.Any<RoleUpsertRequest>(), Arg.Any<CancellationToken>())
+            .Returns(PermissionTopologyCommandResult<RoleResponse>.Failure(
+                PermissionTopologyCommandStatus.ValidationFailed,
                 "Role name is required."));
         var sut = new RolesController(service);
 
@@ -73,10 +73,10 @@ public sealed class RolesControllerTests
     [Fact]
     public async Task Create_WhenConflict_ReturnsConflict()
     {
-        var service = Substitute.For<IRoleManagementService>();
-        service.CreateAsync(Arg.Any<RoleUpsertRequest>(), Arg.Any<CancellationToken>())
-            .Returns(RoleManagementCommandResult<RoleResponse>.Failure(
-                RoleManagementCommandStatus.Conflict,
+        var service = Substitute.For<IPermissionTopology>();
+        service.CreateRoleAsync(Arg.Any<RoleUpsertRequest>(), Arg.Any<CancellationToken>())
+            .Returns(PermissionTopologyCommandResult<RoleResponse>.Failure(
+                PermissionTopologyCommandStatus.Conflict,
                 "Role exists."));
         var sut = new RolesController(service);
 
@@ -88,9 +88,9 @@ public sealed class RolesControllerTests
     [Fact]
     public async Task Update_WhenSuccess_ReturnsOk()
     {
-        var service = Substitute.For<IRoleManagementService>();
-        service.UpdateAsync(Arg.Any<Guid>(), Arg.Any<RoleUpsertRequest>(), Arg.Any<CancellationToken>())
-            .Returns(RoleManagementCommandResult<RoleResponse>.Success(new RoleResponse { Id = Guid.NewGuid(), Name = "support" }));
+        var service = Substitute.For<IPermissionTopology>();
+        service.UpdateRoleAsync(Arg.Any<Guid>(), Arg.Any<RoleUpsertRequest>(), Arg.Any<CancellationToken>())
+            .Returns(PermissionTopologyCommandResult<RoleResponse>.Success(new RoleResponse { Id = Guid.NewGuid(), Name = "support" }));
         var sut = new RolesController(service);
 
         var result = await sut.Update(Guid.NewGuid(), new RoleUpsertRequest { Name = "support" }, CancellationToken.None);
@@ -101,9 +101,9 @@ public sealed class RolesControllerTests
     [Fact]
     public async Task Update_WhenMissing_ReturnsNotFound()
     {
-        var service = Substitute.For<IRoleManagementService>();
-        service.UpdateAsync(Arg.Any<Guid>(), Arg.Any<RoleUpsertRequest>(), Arg.Any<CancellationToken>())
-            .Returns(RoleManagementCommandResult<RoleResponse>.Failure(RoleManagementCommandStatus.NotFound, "Missing."));
+        var service = Substitute.For<IPermissionTopology>();
+        service.UpdateRoleAsync(Arg.Any<Guid>(), Arg.Any<RoleUpsertRequest>(), Arg.Any<CancellationToken>())
+            .Returns(PermissionTopologyCommandResult<RoleResponse>.Failure(PermissionTopologyCommandStatus.NotFound, "Missing."));
         var sut = new RolesController(service);
 
         var result = await sut.Update(Guid.NewGuid(), new RoleUpsertRequest { Name = "support" }, CancellationToken.None);
@@ -114,9 +114,9 @@ public sealed class RolesControllerTests
     [Fact]
     public async Task Delete_WhenSuccess_ReturnsNoContent()
     {
-        var service = Substitute.For<IRoleManagementService>();
-        service.DeleteAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-            .Returns(RoleManagementCommandResult<RoleResponse>.Success(new RoleResponse()));
+        var service = Substitute.For<IPermissionTopology>();
+        service.DeleteRoleAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(PermissionTopologyCommandResult<RoleResponse>.Success(new RoleResponse()));
         var sut = new RolesController(service);
 
         var result = await sut.Delete(Guid.NewGuid(), CancellationToken.None);
@@ -127,9 +127,9 @@ public sealed class RolesControllerTests
     [Fact]
     public async Task Delete_WhenProtected_ReturnsConflict()
     {
-        var service = Substitute.For<IRoleManagementService>();
-        service.DeleteAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-            .Returns(RoleManagementCommandResult<RoleResponse>.Failure(RoleManagementCommandStatus.Protected, "Protected."));
+        var service = Substitute.For<IPermissionTopology>();
+        service.DeleteRoleAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(PermissionTopologyCommandResult<RoleResponse>.Failure(PermissionTopologyCommandStatus.Protected, "Protected."));
         var sut = new RolesController(service);
 
         var result = await sut.Delete(Guid.NewGuid(), CancellationToken.None);
@@ -140,8 +140,8 @@ public sealed class RolesControllerTests
     [Fact]
     public async Task GetPermissions_WhenMissing_ReturnsNotFound()
     {
-        var service = Substitute.For<IRoleManagementService>();
-        service.GetPermissionsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+        var service = Substitute.For<IPermissionTopology>();
+        service.GetRolePermissionsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns((IReadOnlyList<string>?)null);
         var sut = new RolesController(service);
 
@@ -153,8 +153,8 @@ public sealed class RolesControllerTests
     [Fact]
     public async Task GetPermissions_WhenSuccess_ReturnsPermissionsAndRequiresReadPermission()
     {
-        var service = Substitute.For<IRoleManagementService>();
-        service.GetPermissionsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+        var service = Substitute.For<IPermissionTopology>();
+        service.GetRolePermissionsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns([PermissionConstants.UsersReadAll]);
         var sut = new RolesController(service);
 
@@ -169,10 +169,10 @@ public sealed class RolesControllerTests
     [Fact]
     public async Task SyncPermissions_WhenInvalid_ReturnsValidationProblem()
     {
-        var service = Substitute.For<IRoleManagementService>();
-        service.SyncPermissionsAsync(Arg.Any<Guid>(), Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
-            .Returns(RoleManagementCommandResult<IReadOnlyList<string>>.Failure(
-                RoleManagementCommandStatus.ValidationFailed,
+        var service = Substitute.For<IPermissionTopology>();
+        service.SyncRolePermissionsAsync(Arg.Any<Guid>(), Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(PermissionTopologyCommandResult<IReadOnlyList<string>>.Failure(
+                PermissionTopologyCommandStatus.ValidationFailed,
                 "Permission invalid."));
         var sut = new RolesController(service);
 
@@ -186,11 +186,27 @@ public sealed class RolesControllerTests
     }
 
     [Fact]
+    public async Task SyncPermissions_WhenRoleMissing_ReturnsNotFound()
+    {
+        var service = Substitute.For<IPermissionTopology>();
+        service.SyncRolePermissionsAsync(Arg.Any<Guid>(), Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(PermissionTopologyCommandResult<IReadOnlyList<string>>.Failure(PermissionTopologyCommandStatus.NotFound));
+        var sut = new RolesController(service);
+
+        var result = await sut.SyncPermissions(
+            Guid.NewGuid(),
+            new RolePermissionSyncRequest { Permissions = ["missing.permission"] },
+            CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
     public async Task SyncPermissions_WhenSuccess_ReturnsNoContentAndRequiresWritePermission()
     {
-        var service = Substitute.For<IRoleManagementService>();
-        service.SyncPermissionsAsync(Arg.Any<Guid>(), Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
-            .Returns(RoleManagementCommandResult<IReadOnlyList<string>>.Success([PermissionConstants.UsersReadAll]));
+        var service = Substitute.For<IPermissionTopology>();
+        service.SyncRolePermissionsAsync(Arg.Any<Guid>(), Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(PermissionTopologyCommandResult<IReadOnlyList<string>>.Success([PermissionConstants.UsersReadAll]));
         var sut = new RolesController(service);
 
         var result = await sut.SyncPermissions(

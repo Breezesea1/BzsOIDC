@@ -2,8 +2,8 @@
 @using BzsOIDC.Shared.Infrastructure.Authorization
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.Extensions.Localization
-@using OpenIddict.Abstractions
 @inject IStringLocalizer<ClientManagement> L
+@inject IOidcClientProfile ClientProfile
 
 <AdminDialogShell IsOpen="@IsOpen"
                   IsBusy="@IsBusy"
@@ -234,8 +234,9 @@
         new(OidcClientConsentType.Explicit, L["ConsentExplicit"]),
     ];
 
-    private IReadOnlyList<string> OpenIddictPermissions => OidcClientDescriptorFactory
-        .BuildPermissions(BuildPreviewRequest())
+    private IReadOnlyList<string> OpenIddictPermissions => ClientProfile
+        .Evaluate(BuildPreviewRequest())
+        .Permissions
         .OrderBy(static permission => permission, StringComparer.OrdinalIgnoreCase)
         .ToArray();
 
@@ -272,7 +273,7 @@
 
     private Task ApplyPreset(OidcClientPresetKind kind)
     {
-        var preset = OidcClientDescriptorFactory.CreatePreset(new OidcClientPresetRequest
+        var preset = ClientProfile.CreatePreset(new OidcClientPresetRequest
         {
             Kind = kind,
             ClientId = ClientId,
@@ -302,24 +303,17 @@
 
     private OidcClientUpsertRequest BuildPreviewRequest()
     {
-        var scopes = ParseLines(ScopesText);
-
-        return new OidcClientUpsertRequest
+        return ClientProfile.CreateRequest(new OidcClientProfileDraft
         {
             ClientId = string.IsNullOrWhiteSpace(ClientId) ? null : ClientId,
             ClientSecret = string.IsNullOrWhiteSpace(ClientSecret) ? null : ClientSecret,
             DisplayName = string.IsNullOrWhiteSpace(DisplayName) ? "Preview client" : DisplayName,
             AuthFlow = AuthFlow,
-            ConsentType = AuthFlow == OidcClientAuthFlow.AuthorizationCode ? ConsentType : OidcClientConsentType.External,
-            PublicClient = AuthFlow == OidcClientAuthFlow.AuthorizationCode,
-            RequireProofKeyForCodeExchange = AuthFlow == OidcClientAuthFlow.AuthorizationCode,
-            GrantTypes = AuthFlow == OidcClientAuthFlow.AuthorizationCode
-                ? [OpenIddictConstants.GrantTypes.AuthorizationCode, OpenIddictConstants.GrantTypes.RefreshToken]
-                : [OpenIddictConstants.GrantTypes.ClientCredentials],
-            Scopes = scopes,
+            ConsentType = ConsentType,
+            Scopes = ParseLines(ScopesText),
             RedirectUris = ParseLines(RedirectUrisText),
             PostLogoutRedirectUris = ParseLines(PostLogoutRedirectUrisText),
-        };
+        });
     }
 
     private static string[] ParseLines(string? raw)

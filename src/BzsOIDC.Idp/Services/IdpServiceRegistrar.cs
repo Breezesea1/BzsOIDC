@@ -79,6 +79,7 @@ internal sealed class IdpServiceRegistrar(IServiceCollection sc, IConfiguration 
     internal IServiceCollection AddOidc()
     {
         sc.AddScoped<IOidcConsentPageRenderer, OidcConsentPageRenderer>();
+        sc.AddScoped<IOidcConsentLifecycle, OidcConsentLifecycle>();
         sc.AddScoped<OidcClientPermissionBackfillService>();
 
         var oidcOptions = cfg.GetSection(OidcSectionName).Get<OidcOptions>();

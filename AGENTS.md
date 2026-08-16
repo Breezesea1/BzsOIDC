@@ -186,3 +186,20 @@ dotnet test <affected project or filtered test>
 4. For broader changes, finish with `dotnet test BzsOIDC.sln`.
 5. If you changed frontend assets or UI classes under `src/BzsOIDC.Idp/`, make sure the CSS/asset pipeline still works.
 Keep this file synchronized with the repo whenever projects, test layers, or rule files change.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs are tracked in GitHub Issues for `Breezesea1/BzsOIDC`.
+See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the five canonical Matt flow labels.
+See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repository using root `CONTEXT.md` and `docs/adr/`.
+See `docs/agents/domain.md`.

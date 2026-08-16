@@ -7,7 +7,6 @@ using BzsOIDC.Idp.Models;
 using BzsOIDC.Idp.Services.Identity;
 using BzsOIDC.Idp.UnitTests.TestDoubles;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 using NSubstitute;
@@ -37,12 +36,10 @@ public sealed class UserManagementPageTests
             }))
             .ToArray();
 
-        var userService = Substitute.For<IUserService>();
-        userService.GetAllAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult<IReadOnlyList<BzsUser>>(users));
+        var userAdministration = CreateUserAdministration(users);
 
         context.Services.AddBootstrapBlazor();
-        context.Services.AddSingleton(userService);
-        context.Services.AddSingleton<UserManager<BzsUser>>(new TestUserManager());
+        context.Services.AddSingleton(userAdministration);
         context.Services.AddSingleton<IStringLocalizer<UserManagement>, TestStringLocalizer<UserManagement>>();
         context.Services.AddSingleton<IHttpContextAccessor>(CreateAdminHttpContextAccessor());
 
@@ -67,17 +64,15 @@ public sealed class UserManagementPageTests
 
 
     [Fact]
-    public void Toolbar_RendersControlsInSingleCommandBarWithoutHeroCopy()
+    public void Toolbar_WhenPageRenders_ShowsControlsInSingleCommandBarWithoutHeroCopy()
     {
         using var context = CreateContext();
 
         var users = CreateUsers();
-        var userService = Substitute.For<IUserService>();
-        userService.GetAllAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult<IReadOnlyList<BzsUser>>(users));
+        var userAdministration = CreateUserAdministration(users);
 
         context.Services.AddBootstrapBlazor();
-        context.Services.AddSingleton(userService);
-        context.Services.AddSingleton<UserManager<BzsUser>>(new TestUserManager((user, role) => (user.UserName ?? string.Empty).StartsWith("admin-", StringComparison.OrdinalIgnoreCase)));
+        context.Services.AddSingleton(userAdministration);
         context.Services.AddSingleton<IStringLocalizer<UserManagement>, TestStringLocalizer<UserManagement>>();
         context.Services.AddSingleton<IHttpContextAccessor>(CreateAdminHttpContextAccessor());
 
@@ -101,12 +96,10 @@ public sealed class UserManagementPageTests
         using var context = CreateContext();
 
         var users = CreateUsers();
-        var userService = Substitute.For<IUserService>();
-        userService.GetAllAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult<IReadOnlyList<BzsUser>>(users));
+        var userAdministration = CreateUserAdministration(users);
 
         context.Services.AddBootstrapBlazor();
-        context.Services.AddSingleton(userService);
-        context.Services.AddSingleton<UserManager<BzsUser>>(new TestUserManager((user, role) => (user.UserName ?? string.Empty).StartsWith("admin-", StringComparison.OrdinalIgnoreCase)));
+        context.Services.AddSingleton(userAdministration);
         context.Services.AddSingleton<IStringLocalizer<UserManagement>, TestStringLocalizer<UserManagement>>();
         context.Services.AddSingleton<IHttpContextAccessor>(CreateAdminHttpContextAccessor());
 
@@ -137,12 +130,10 @@ public sealed class UserManagementPageTests
         using var context = CreateContext();
 
         var users = CreateUsers();
-        var userService = Substitute.For<IUserService>();
-        userService.GetAllAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult<IReadOnlyList<BzsUser>>(users));
+        var userAdministration = CreateUserAdministration(users);
 
         context.Services.AddBootstrapBlazor();
-        context.Services.AddSingleton(userService);
-        context.Services.AddSingleton<UserManager<BzsUser>>(new TestUserManager((user, role) => (user.UserName ?? string.Empty).StartsWith("admin-", StringComparison.OrdinalIgnoreCase)));
+        context.Services.AddSingleton(userAdministration);
         context.Services.AddSingleton<IStringLocalizer<UserManagement>, TestStringLocalizer<UserManagement>>();
         context.Services.AddSingleton<IHttpContextAccessor>(CreateAdminHttpContextAccessor());
 
@@ -165,12 +156,10 @@ public sealed class UserManagementPageTests
         using var context = CreateContext();
 
         var users = CreateUsers();
-        var userService = Substitute.For<IUserService>();
-        userService.GetAllAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult<IReadOnlyList<BzsUser>>(users));
+        var userAdministration = CreateUserAdministration(users);
 
         context.Services.AddBootstrapBlazor();
-        context.Services.AddSingleton(userService);
-        context.Services.AddSingleton<UserManager<BzsUser>>(new TestUserManager((user, role) => false));
+        context.Services.AddSingleton(userAdministration);
         context.Services.AddSingleton<IStringLocalizer<UserManagement>, TestStringLocalizer<UserManagement>>();
         context.Services.AddSingleton<IHttpContextAccessor>(CreateAdminHttpContextAccessor());
 
@@ -182,7 +171,7 @@ public sealed class UserManagementPageTests
             PageIndex = 1,
             PageItems = 10,
         };
-        options.Filters.Add(new SearchFilterAction(nameof(BzsUser.Email), "beta", FilterAction.Contains));
+        options.Filters.Add(new SearchFilterAction("Email", "beta", FilterAction.Contains));
 
         var queryMethod = typeof(UserManagement).GetMethod(
             "QueryUsersAsync",
@@ -211,12 +200,10 @@ public sealed class UserManagementPageTests
         using var context = CreateContext();
 
         var users = CreateUsers();
-        var userService = Substitute.For<IUserService>();
-        userService.GetAllAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult<IReadOnlyList<BzsUser>>(users));
+        var userAdministration = CreateUserAdministration(users);
 
         context.Services.AddBootstrapBlazor();
-        context.Services.AddSingleton(userService);
-        context.Services.AddSingleton<UserManager<BzsUser>>(new TestUserManager((user, role) => (user.UserName ?? string.Empty).StartsWith("admin-", StringComparison.OrdinalIgnoreCase)));
+        context.Services.AddSingleton(userAdministration);
         context.Services.AddSingleton<IStringLocalizer<UserManagement>, TestStringLocalizer<UserManagement>>();
         context.Services.AddSingleton<IHttpContextAccessor>(CreateAdminHttpContextAccessor());
 
@@ -261,12 +248,10 @@ public sealed class UserManagementPageTests
         };
 
         var users = new[] { currentUser, otherUser };
-        var userService = Substitute.For<IUserService>();
-        userService.GetAllAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult<IReadOnlyList<BzsUser>>(users));
+        var userAdministration = CreateUserAdministration(users);
 
         context.Services.AddBootstrapBlazor();
-        context.Services.AddSingleton(userService);
-        context.Services.AddSingleton<UserManager<BzsUser>>(new TestUserManager((user, role) => true));
+        context.Services.AddSingleton(userAdministration);
         context.Services.AddSingleton<IStringLocalizer<UserManagement>, TestStringLocalizer<UserManagement>>();
         context.Services.AddSingleton<IHttpContextAccessor>(CreateAdminHttpContextAccessor(currentUserId));
 
@@ -287,12 +272,10 @@ public sealed class UserManagementPageTests
         using var context = CreateContext();
 
         var users = CreateUsers();
-        var userService = Substitute.For<IUserService>();
-        userService.GetAllAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult<IReadOnlyList<BzsUser>>(users));
+        var userAdministration = CreateUserAdministration(users);
 
         context.Services.AddBootstrapBlazor();
-        context.Services.AddSingleton(userService);
-        context.Services.AddSingleton<UserManager<BzsUser>>(new TestUserManager((user, role) => false));
+        context.Services.AddSingleton(userAdministration);
         context.Services.AddSingleton<IStringLocalizer<UserManagement>, TestStringLocalizer<UserManagement>>();
         context.Services.AddSingleton<IHttpContextAccessor>(CreateAdminHttpContextAccessor());
 
@@ -304,6 +287,37 @@ public sealed class UserManagementPageTests
 
         Assert.NotNull(betaRow.QuerySelector("button[aria-label='Edit']"));
         Assert.NotNull(betaRow.QuerySelector("button[aria-label='Delete']"));
+    }
+
+    [Fact]
+    public void CreateUser_WhenAdministrationReturnsIdentityError_UsesLocalizedErrorCodeInsteadOfRawDescription()
+    {
+        using var context = CreateContext();
+        var userAdministration = CreateUserAdministration(CreateUsers());
+        userAdministration.CreateAsync(
+                Arg.Any<CreateUserAdministrationRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(UserAdministrationResult.Failure(
+                new UserAdministrationError(UserAdministrationErrorCodes.DuplicateUserName, ["duplicate"]))));
+
+        context.Services.AddBootstrapBlazor();
+        context.Services.AddSingleton(userAdministration);
+        context.Services.AddSingleton<IStringLocalizer<UserManagement>, TestStringLocalizer<UserManagement>>();
+        context.Services.AddSingleton<IHttpContextAccessor>(CreateAdminHttpContextAccessor());
+
+        var cut = context.Render<UserManagement>();
+        cut.WaitForAssertion(() => Assert.Contains("beta-user", cut.Markup, StringComparison.Ordinal));
+
+        cut.FindAll("button").Single(button => button.TextContent.Contains("NewUser", StringComparison.Ordinal)).Click();
+        cut.Find("#editor-user-name").Input("duplicate");
+        cut.Find("#editor-password").Input("Password1!");
+        cut.FindAll("button").Single(button => button.TextContent.Contains("CreateUser", StringComparison.Ordinal)).Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("DuplicateUserName", cut.Markup, StringComparison.Ordinal);
+            Assert.DoesNotContain("raw identity description", cut.Markup, StringComparison.Ordinal);
+        });
     }
 
     private static BunitContext CreateContext()
@@ -338,6 +352,21 @@ public sealed class UserManagementPageTests
                 Email = "gamma@example.com",
             }
         ];
+    }
+
+    private static IUserAdministration CreateUserAdministration(IEnumerable<BzsUser> users)
+    {
+        var administration = Substitute.For<IUserAdministration>();
+        var projections = users
+            .Select(user => new UserAdministrationUser(
+                user.Id,
+                user.UserName ?? string.Empty,
+                user.Email,
+                (user.UserName ?? string.Empty).StartsWith("admin-", StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+        administration.GetUsersAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<UserAdministrationUser>>(projections));
+        return administration;
     }
 
     private static IHttpContextAccessor CreateAdminHttpContextAccessor(Guid? currentUserId = null)

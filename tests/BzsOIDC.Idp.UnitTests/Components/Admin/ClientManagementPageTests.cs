@@ -145,16 +145,68 @@ public sealed class ClientManagementPageTests
         });
     }
 
+    [Fact]
+    public void Save_WhenCreatingMachineClient_UsesProfileCreatedRequest()
+    {
+        using var context = CreateContext();
+        var profile = Substitute.For<IOidcClientProfile>();
+        var profileRequest = new OidcClientUpsertRequest
+        {
+            ClientId = "profile-client",
+            DisplayName = "Profile client",
+            AuthFlow = OidcClientAuthFlow.ClientCredentials,
+            PublicClient = false,
+            RequireProofKeyForCodeExchange = false,
+            ConsentType = OidcClientConsentType.External,
+            GrantTypes = ["profile-managed-grant"],
+            Scopes = ["profile-managed-scope"],
+        };
+        profile.CreateRequest(Arg.Any<OidcClientProfileDraft>()).Returns(profileRequest);
+        profile.Evaluate(Arg.Any<OidcClientUpsertRequest>()).Returns(new OidcClientProfileEvaluation
+        {
+            Request = profileRequest,
+        });
+
+        var clientService = RegisterServices(context, [], profile);
+        clientService.RegisterAsync(Arg.Any<OidcClientUpsertRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new OidcClientCommandResult<OidcClientRegistrationResponse>
+            {
+                Status = OidcClientCommandStatus.Success,
+                Value = new OidcClientRegistrationResponse
+                {
+                    ClientId = "profile-client",
+                    DisplayName = "Profile client",
+                    AuthFlow = OidcClientAuthFlow.ClientCredentials,
+                },
+            }));
+
+        var cut = context.Render<ClientManagement>();
+        cut.WaitForAssertion(() => Assert.NotNull(cut.FindAll("button").SingleOrDefault(button =>
+            button.TextContent.Contains("NewClient", StringComparison.Ordinal))));
+
+        cut.FindAll("button").Single(button => button.TextContent.Contains("NewClient", StringComparison.Ordinal)).Click();
+        cut.Find("#editor-auth-flow").Click();
+        cut.Find("[data-neo-select-index='1']").Click();
+        cut.Find("#editor-display-name").Input("Machine client");
+        cut.FindAll("button").Single(button => button.TextContent.Contains("RegisterClient", StringComparison.Ordinal)).Click();
+
+        cut.WaitForAssertion(() => clientService.Received(1).RegisterAsync(profileRequest, Arg.Any<CancellationToken>()));
+    }
+
     private static BunitContext CreateContext()
     {
         var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.JSInterop.SetupModule("./Components/Admin/AdminDialogShell.razor.js")
-            .SetupVoid("activate", _ => true);
+            .SetupVoid("activate", _ => true)
+            .SetVoidResult();
         return context;
     }
 
-    private static void RegisterServices(BunitContext context, IReadOnlyList<OidcClientResponse> clients)
+    private static IOidcClientService RegisterServices(
+        BunitContext context,
+        IReadOnlyList<OidcClientResponse> clients,
+        IOidcClientProfile? clientProfile = null)
     {
         var clientService = Substitute.For<IOidcClientService>();
         clientService.GetAllAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(clients));
@@ -163,10 +215,13 @@ public sealed class ClientManagementPageTests
             .Returns(Task.FromResult<IReadOnlyList<OidcScopeResponse>>([]));
 
         context.Services.AddBootstrapBlazor();
+        context.Services.AddSingleton<IOidcClientProfile>(clientProfile ?? new OidcClientProfile());
         context.Services.AddSingleton<IOidcClientService>(clientService);
         context.Services.AddSingleton<IOidcScopeService>(scopeService);
         context.Services.AddSingleton<IStringLocalizer<ClientManagement>, TestStringLocalizer<ClientManagement>>();
         context.Services.AddSingleton<IHttpContextAccessor>(CreateAdminHttpContextAccessor());
+
+        return clientService;
     }
 
     private static IHttpContextAccessor CreateAdminHttpContextAccessor()

@@ -54,10 +54,26 @@ public sealed class ClientManagementDialogTests
         Assert.NotNull(cut.Find("#editor-client-secret"));
     }
 
+    [Fact]
+    public void Render_WhenMachineProfile_ShowsPermissionsFromClientProfile()
+    {
+        using var context = CreateContext();
+        var cut = context.Render<ClientManagementDialog>(parameters => parameters
+            .Add(x => x.IsOpen, true)
+            .Add(x => x.AuthFlow, OidcClientAuthFlow.ClientCredentials)
+            .Add(x => x.DisplayName, "Machine client")
+            .Add(x => x.ScopesText, "api"));
+
+        Assert.Contains("ept:token", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("ept:introspection", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("gt:client_credentials", cut.Markup, StringComparison.Ordinal);
+    }
+
     private static BunitContext CreateContext()
     {
         var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddSingleton<IOidcClientProfile, OidcClientProfile>();
         context.Services.AddSingleton<IStringLocalizer<ClientManagement>, TestStringLocalizer<ClientManagement>>();
         return context;
     }

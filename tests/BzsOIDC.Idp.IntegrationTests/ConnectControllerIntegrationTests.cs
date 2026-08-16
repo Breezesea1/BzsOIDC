@@ -715,6 +715,7 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
         Assert.NotNull(created);
         Assert.Equal("interactive-client", created.ClientId);
         Assert.Equal(OidcClientAuthFlow.AuthorizationCode, created.AuthFlow);
+        Assert.Null(created.ClientSecret);
 
         using var getResponse = await _client.GetAsync($"/api/oidc/clients/{created.ClientId}");
         getResponse.EnsureSuccessStatusCode();
@@ -727,6 +728,7 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
         Assert.Equal(OidcClientConsentType.Implicit, client.ConsentType);
         Assert.Contains(OpenIddictConstants.GrantTypes.AuthorizationCode, client.GrantTypes);
         Assert.Contains(PermissionConstants.ScopeApi, client.Scopes);
+        Assert.Contains(OpenIddictConstants.Requirements.Features.ProofKeyForCodeExchange, client.Requirements);
     }
 
     [Fact]
@@ -900,7 +902,24 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
         var created = await createResponse.Content.ReadFromJsonAsync<OidcClientRegistrationResponse>();
         Assert.NotNull(created);
         Assert.Equal(OidcClientAuthFlow.ClientCredentials, created.AuthFlow);
-        Assert.False(string.IsNullOrWhiteSpace(created.ClientSecret));
+        Assert.Matches("^[0-9A-F]{64}$", created.ClientSecret!);
+
+        request = new OidcClientUpsertRequest
+        {
+            ClientId = "machine-client-managed-2",
+            DisplayName = "Second Managed Machine Client",
+            AuthFlow = OidcClientAuthFlow.ClientCredentials,
+            PublicClient = false,
+            GrantTypes = [OpenIddictConstants.GrantTypes.ClientCredentials],
+            Scopes = [PermissionConstants.ScopeApi],
+        };
+
+        using var secondCreateResponse = await _client.PostAsJsonAsync("/api/oidc/clients", request);
+        Assert.Equal(HttpStatusCode.Created, secondCreateResponse.StatusCode);
+        var secondCreated = await secondCreateResponse.Content.ReadFromJsonAsync<OidcClientRegistrationResponse>();
+        Assert.NotNull(secondCreated);
+        Assert.Matches("^[0-9A-F]{64}$", secondCreated.ClientSecret!);
+        Assert.NotEqual(created.ClientSecret, secondCreated.ClientSecret);
 
         using var getResponse = await _client.GetAsync($"/api/oidc/clients/{created.ClientId}");
         getResponse.EnsureSuccessStatusCode();
@@ -1118,13 +1137,12 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
         registrar.AddDataProtection();
         registrar.AddOidc();
 
-        builder.Services.AddScoped<IRoleService, RoleService>();
         builder.Services.AddScoped<IUserService, UserService>();
-        builder.Services.AddScoped<IRolePermissionService, RolePermissionService>();
-        builder.Services.AddScoped<IPermissionCatalogService, PermissionCatalogService>();
+        builder.Services.AddScoped<IUserAdministration, UserAdministration>();
         builder.Services.AddScoped<RoleManagementPolicy>();
-        builder.Services.AddScoped<IRoleManagementService, RoleManagementService>();
+        builder.Services.AddScoped<IPermissionTopology, PermissionTopologyService>();
         builder.Services.AddScoped<IOidcPrincipalFactory, OidcPrincipalFactory>();
+        builder.Services.AddScoped<IOidcClientProfile, OidcClientProfile>();
         builder.Services.AddScoped<IOidcClientService, OidcClientService>();
         builder.Services.AddScoped<IOidcScopeService, OidcScopeService>();
         builder.Services.AddScoped<IAdminDashboardService, AdminDashboardService>();
@@ -1166,11 +1184,13 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
             Assert.True(updateResult.Succeeded, string.Join(", ", updateResult.Errors.Select(static e => e.Description)));
 
             var applicationManager = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
+            var clientService = scope.ServiceProvider.GetRequiredService<IOidcClientService>();
             await EnsureApplicationAsync(
-                applicationManager,
+                clientService,
                 WebClientId,
                 new OidcClientUpsertRequest
                 {
+                    ClientId = WebClientId,
                     DisplayName = "Web Client",
                     PublicClient = true,
                     GrantTypes = [OpenIddictConstants.GrantTypes.AuthorizationCode, OpenIddictConstants.GrantTypes.RefreshToken],
@@ -1185,10 +1205,11 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
                     RedirectUris = [WebRedirectUri.ToString()],
                 });
             await EnsureApplicationAsync(
-                applicationManager,
+                clientService,
                 MachineClientId,
                 new OidcClientUpsertRequest
                 {
+                    ClientId = MachineClientId,
                     DisplayName = "Machine Client",
                     PublicClient = false,
                     ClientSecret = MachineClientSecret,
@@ -1217,18 +1238,18 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
     }
 
     private static async Task EnsureApplicationAsync(
-        IOpenIddictApplicationManager applicationManager,
+        IOidcClientService clientService,
         string clientId,
         OidcClientUpsertRequest request)
     {
-        var existingApplication = await applicationManager.FindByClientIdAsync(clientId);
+        var existingApplication = await clientService.GetByClientIdAsync(clientId);
         if (existingApplication is not null)
         {
             return;
         }
 
-        var descriptor = OidcClientDescriptorFactory.CreateDescriptor(request, clientId);
-        await applicationManager.CreateAsync(descriptor);
+        var result = await clientService.RegisterAsync(request);
+        Assert.Equal(OidcClientCommandStatus.Success, result.Status);
     }
 
     private static async Task CreateLegacyApplicationAsync(
@@ -1314,13 +1335,14 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
     private async Task EnsureExplicitConsentClientAsync(string clientId, string redirectUri)
     {
         await using var scope = _app.Services.CreateAsyncScope();
-        var applicationManager = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
+        var clientService = scope.ServiceProvider.GetRequiredService<IOidcClientService>();
 
         await EnsureApplicationAsync(
-            applicationManager,
+            clientService,
             clientId,
             new OidcClientUpsertRequest
             {
+                ClientId = clientId,
                 DisplayName = clientId,
                 AuthFlow = OidcClientAuthFlow.AuthorizationCode,
                 PublicClient = true,

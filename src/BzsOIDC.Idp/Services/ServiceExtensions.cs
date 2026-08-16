@@ -55,15 +55,15 @@ internal static class ServiceExtensions
         registrar.AddDataProtection();
         registrar.AddOidc();
 
-        sc.AddScoped<IRoleService, RoleService>();
         sc.AddScoped<RoleManagementPolicy>();
-        sc.AddScoped<IRoleManagementService, RoleManagementService>();
         sc.AddScoped<IUserService, UserService>();
-        sc.AddScoped<IRolePermissionService, RolePermissionService>();
-        sc.AddScoped<IPermissionCatalogService, PermissionCatalogService>();
+        sc.AddScoped<IUserAdministration, UserAdministration>();
+        sc.AddScoped<IPermissionTopology, PermissionTopologyService>();
         sc.AddScoped<IOidcPrincipalFactory, OidcPrincipalFactory>();
+        sc.AddScoped<IOidcClientProfile, OidcClientProfile>();
         sc.AddScoped<IOidcClientService, OidcClientService>();
         sc.AddScoped<IOidcScopeService, OidcScopeService>();
+        sc.AddScoped<IOidcAdministrationTopology, OidcAdministrationTopology>();
         sc.AddScoped<IAdminDashboardService, AdminDashboardService>();
         sc.AddScoped<IdentitySeeder>();
 

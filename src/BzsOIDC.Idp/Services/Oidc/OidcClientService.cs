@@ -19,7 +19,9 @@ public interface IOidcClientService
     Task<bool> DeleteAsync(string clientId, CancellationToken cancellationToken = default);
 }
 
-internal sealed class OidcClientService(IOpenIddictApplicationManager applicationManager) : IOidcClientService
+internal sealed class OidcClientService(
+    IOpenIddictApplicationManager applicationManager,
+    IOidcClientProfile clientProfile) : IOidcClientService
 {
     /// <summary>
     /// 创建数据。
@@ -31,19 +33,17 @@ internal sealed class OidcClientService(IOpenIddictApplicationManager applicatio
         OidcClientUpsertRequest request,
         CancellationToken cancellationToken = default)
     {
-        var errors = OidcClientDescriptorFactory.ValidateRequest(request);
-        if (errors.Count > 0)
+        var evaluation = clientProfile.Evaluate(request);
+        if (evaluation.Errors.Length > 0)
         {
             return new OidcClientCommandResult<OidcClientRegistrationResponse>
             {
                 Status = OidcClientCommandStatus.ValidationFailed,
-                Errors = errors.ToArray(),
+                Errors = evaluation.Errors,
             };
         }
 
-        var clientId = string.IsNullOrWhiteSpace(request.ClientId)
-            ? $"client-{Guid.NewGuid():N}"
-            : request.ClientId.Trim();
+        var clientId = evaluation.Request.ClientId ?? $"client-{Guid.NewGuid():N}";
 
         var exists = await applicationManager.FindByClientIdAsync(clientId, cancellationToken);
         if (exists is not null)
@@ -55,7 +55,7 @@ internal sealed class OidcClientService(IOpenIddictApplicationManager applicatio
             };
         }
 
-        var descriptor = OidcClientDescriptorFactory.CreateDescriptor(request, clientId);
+        var descriptor = OidcClientDescriptorAdapter.CreateDescriptor(evaluation, clientId);
         await applicationManager.CreateAsync(descriptor, cancellationToken);
 
         return new OidcClientCommandResult<OidcClientRegistrationResponse>
@@ -66,7 +66,7 @@ internal sealed class OidcClientService(IOpenIddictApplicationManager applicatio
                 ClientId = descriptor.ClientId!,
                 ClientSecret = descriptor.ClientSecret,
                 DisplayName = descriptor.DisplayName ?? descriptor.ClientId!,
-                AuthFlow = OidcClientDescriptorFactory.ResolveAuthFlow(request, out _)!.Value,
+                AuthFlow = evaluation.AuthFlow!.Value,
             },
         };
     }
@@ -112,13 +112,13 @@ internal sealed class OidcClientService(IOpenIddictApplicationManager applicatio
         OidcClientUpsertRequest request,
         CancellationToken cancellationToken = default)
     {
-        var errors = OidcClientDescriptorFactory.ValidateRequest(request);
-        if (errors.Count > 0)
+        var evaluation = clientProfile.Evaluate(request);
+        if (evaluation.Errors.Length > 0)
         {
             return new OidcClientCommandResult<OidcClientResponse>
             {
                 Status = OidcClientCommandStatus.ValidationFailed,
-                Errors = errors.ToArray(),
+                Errors = evaluation.Errors,
             };
         }
 
@@ -131,7 +131,7 @@ internal sealed class OidcClientService(IOpenIddictApplicationManager applicatio
             };
         }
 
-        var descriptor = OidcClientDescriptorFactory.CreateDescriptor(request, clientId);
+        var descriptor = OidcClientDescriptorAdapter.CreateDescriptor(evaluation, clientId);
         await applicationManager.UpdateAsync(application, descriptor, cancellationToken);
 
         return new OidcClientCommandResult<OidcClientResponse>
@@ -169,36 +169,25 @@ internal sealed class OidcClientService(IOpenIddictApplicationManager applicatio
     {
         var permissions = (await applicationManager.GetPermissionsAsync(application, cancellationToken)).ToArray();
         var requirements = (await applicationManager.GetRequirementsAsync(application, cancellationToken)).ToArray();
-        var redirectUris = (await applicationManager.GetRedirectUrisAsync(application, cancellationToken))
-            .Select(static uri => uri)
-            .ToArray();
-        var postLogoutRedirectUris = (await applicationManager.GetPostLogoutRedirectUrisAsync(application, cancellationToken))
-            .Select(static uri => uri)
-            .ToArray();
+        var redirectUris = (await applicationManager.GetRedirectUrisAsync(application, cancellationToken)).ToArray();
+        var postLogoutRedirectUris = (await applicationManager.GetPostLogoutRedirectUrisAsync(application, cancellationToken)).ToArray();
+        var interpretation = clientProfile.InterpretPersistedProfile(new OidcClientPersistedProfile
+        {
+            ClientType = await applicationManager.GetClientTypeAsync(application, cancellationToken),
+            ConsentType = await applicationManager.GetConsentTypeAsync(application, cancellationToken),
+            Permissions = permissions,
+            RedirectUris = redirectUris,
+        });
 
         return new OidcClientResponse
         {
             ClientId = await applicationManager.GetClientIdAsync(application, cancellationToken) ?? string.Empty,
             DisplayName = await applicationManager.GetDisplayNameAsync(application, cancellationToken),
-            AuthFlow = ResolveAuthFlow(permissions,
-                await applicationManager.GetClientTypeAsync(application, cancellationToken),
-                redirectUris),
-            PublicClient = string.Equals(
-                await applicationManager.GetClientTypeAsync(application, cancellationToken),
-                OpenIddictConstants.ClientTypes.Public,
-                StringComparison.OrdinalIgnoreCase),
-            ConsentType = OidcClientDescriptorFactory.FromOpenIddictConsentType(
-                await applicationManager.GetConsentTypeAsync(application, cancellationToken)),
-            GrantTypes = permissions
-                .Where(static permission => permission.StartsWith(OpenIddictConstants.Permissions.Prefixes.GrantType,
-                    StringComparison.OrdinalIgnoreCase))
-                .Select(static permission => permission[OpenIddictConstants.Permissions.Prefixes.GrantType.Length..])
-                .ToArray(),
-            Scopes = permissions
-                .Where(static permission => permission.StartsWith(OpenIddictConstants.Permissions.Prefixes.Scope,
-                    StringComparison.OrdinalIgnoreCase))
-                .Select(static permission => permission[OpenIddictConstants.Permissions.Prefixes.Scope.Length..])
-                .ToArray(),
+            AuthFlow = interpretation.AuthFlow,
+            PublicClient = interpretation.PublicClient,
+            ConsentType = interpretation.ConsentType,
+            GrantTypes = interpretation.GrantTypes,
+            Scopes = interpretation.Scopes,
             RedirectUris = redirectUris,
             PostLogoutRedirectUris = postLogoutRedirectUris,
             Permissions = permissions,
@@ -206,33 +195,4 @@ internal sealed class OidcClientService(IOpenIddictApplicationManager applicatio
         };
     }
 
-    /// <summary>
-    /// 解析并返回结果。
-    /// </summary>
-    /// <param name="permissions">参数permissions。</param>
-    /// <param name="clientType">参数clientType。</param>
-    /// <param name="redirectUris">参数redirectUris。</param>
-    /// <returns>执行结果。</returns>
-    private static OidcClientAuthFlow ResolveAuthFlow(
-        IReadOnlyCollection<string> permissions,
-        string? clientType,
-        IReadOnlyCollection<string> redirectUris)
-    {
-        var grantTypes = permissions
-            .Where(static permission => permission.StartsWith(OpenIddictConstants.Permissions.Prefixes.GrantType,
-                StringComparison.OrdinalIgnoreCase))
-            .Select(static permission => permission[OpenIddictConstants.Permissions.Prefixes.GrantType.Length..])
-            .ToArray();
-
-        if (string.Equals(clientType, OpenIddictConstants.ClientTypes.Public, StringComparison.OrdinalIgnoreCase) &&
-            redirectUris.Count > 0 &&
-            grantTypes.All(static grantType =>
-                string.Equals(grantType, OpenIddictConstants.GrantTypes.AuthorizationCode, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(grantType, OpenIddictConstants.GrantTypes.RefreshToken, StringComparison.OrdinalIgnoreCase)))
-        {
-            return OidcClientAuthFlow.AuthorizationCode;
-        }
-
-        return OidcClientAuthFlow.ClientCredentials;
-    }
 }

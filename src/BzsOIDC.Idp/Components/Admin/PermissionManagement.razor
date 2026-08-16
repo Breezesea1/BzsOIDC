@@ -6,7 +6,7 @@
 @using Microsoft.AspNetCore.WebUtilities
 @using Microsoft.Extensions.Localization
 @inject IHttpContextAccessor HttpContextAccessor
-@inject IPermissionCatalogService PermissionCatalogService
+@inject IPermissionTopology PermissionTopology
 @inject IStringLocalizer<PermissionManagement> L
 @inject NavigationManager NavigationManager
 @layout BzsOIDC.Idp.Client.Components.Layout.MainLayout
@@ -327,7 +327,7 @@ else
         try
         {
             _resources.Clear();
-            _resources.AddRange(await PermissionCatalogService.GetResourcesAsync());
+            _resources.AddRange(await PermissionTopology.GetResourcesAsync());
             _selectedResourceKey ??= _resources.FirstOrDefault()?.Key;
             _selectedPermissionName ??= SelectedResource?.Permissions.FirstOrDefault()?.Name;
             SyncReleaseScopeEditor();
@@ -341,7 +341,7 @@ else
     private async Task CreateDefaultResourceAsync()
     {
         var key = $"resource-{_resources.Count + 1}";
-        await PermissionCatalogService.UpsertResourceAsync(key, new ProtectedResourceUpsertRequest
+        await PermissionTopology.UpsertResourceAsync(key, new ProtectedResourceUpsertRequest
         {
             DisplayName = key,
         });
@@ -360,11 +360,11 @@ else
         }
 
         var permissionName = $"{SelectedResource.Key}.read";
-        await PermissionCatalogService.UpsertPermissionAsync(SelectedResource.Key, permissionName, new PermissionDefinitionUpsertRequest
+        await PermissionTopology.UpsertPermissionAsync(SelectedResource.Key, permissionName, new PermissionDefinitionUpsertRequest
         {
             DisplayName = permissionName,
         });
-        await PermissionCatalogService.SyncReleaseScopesAsync(permissionName, [SelectedResource.Key]);
+        await PermissionTopology.SyncReleaseScopesAsync(permissionName, [SelectedResource.Key]);
         _selectedPermissionName = permissionName;
         _statusMessage = L["PermissionCreated", permissionName].Value;
         _statusIsError = false;
@@ -378,9 +378,9 @@ else
             return;
         }
 
-        var result = await PermissionCatalogService.SyncReleaseScopesAsync(SelectedPermission.Name, ParseLines(_releaseScopesText));
-        _statusIsError = result.Status != PermissionCatalogCommandStatus.Success;
-        _statusMessage = result.Status == PermissionCatalogCommandStatus.Success
+        var result = await PermissionTopology.SyncReleaseScopesAsync(SelectedPermission.Name, ParseLines(_releaseScopesText));
+        _statusIsError = result.Status != PermissionTopologyCommandStatus.Success;
+        _statusMessage = result.Status == PermissionTopologyCommandStatus.Success
             ? L["ReleaseScopesSaved", SelectedPermission.Name].Value
             : string.Join(Environment.NewLine, result.Errors);
         await LoadAsync();

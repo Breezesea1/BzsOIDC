@@ -15,173 +15,98 @@ public sealed class IdentitySeederTests
     [Fact]
     public async Task SeedAsync_WhenAdminUserNameMissing_ThrowsInvalidOperationException()
     {
-        var roleService = Substitute.For<IRoleService>();
-        var rolePermissionService = Substitute.For<IRolePermissionService>();
-        var permissionCatalogService = Substitute.For<IPermissionCatalogService>();
-        var oidcScopeService = Substitute.For<IOidcScopeService>();
-        var oidcClientPermissionBackfillService = CreateOidcClientPermissionBackfillService();
-        var userService = Substitute.For<IUserService>();
-
-        var options = Options.Create(new IdentitySeedOptions
-        {
-            Admin = new SeedAdminOptions
-            {
-                UserName = string.Empty,
-                Password = "admin123",
-            },
-        });
-        var configuration = new ConfigurationBuilder().Build();
-
         var sut = new IdentitySeeder(
-            roleService,
-            rolePermissionService,
-            permissionCatalogService,
-            oidcScopeService,
-            oidcClientPermissionBackfillService,
-            userService,
-            options,
-            configuration,
+            Substitute.For<IPermissionTopology>(),
+            Substitute.For<IOidcScopeService>(),
+            CreateOidcClientPermissionBackfillService(),
+            Substitute.For<IUserService>(),
+            Options.Create(new IdentitySeedOptions
+            {
+                Admin = new SeedAdminOptions
+                {
+                    UserName = string.Empty,
+                    Password = "admin123",
+                },
+            }),
+            new ConfigurationBuilder().Build(),
             NullLogger<IdentitySeeder>.Instance);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => sut.SeedAsync());
     }
 
     [Fact]
-    public async Task SeedAsync_WhenAdminAlreadyExists_DoesNotCreateUserAgain()
+    public async Task SeedAsync_WhenDefaultsAreConfigured_InitializesCompleteTopologyThroughSingleSeam()
     {
-        var roleService = Substitute.For<IRoleService>();
-        var rolePermissionService = Substitute.For<IRolePermissionService>();
-        var permissionCatalogService = Substitute.For<IPermissionCatalogService>();
-        var oidcScopeService = Substitute.For<IOidcScopeService>();
-        var oidcClientPermissionBackfillService = CreateOidcClientPermissionBackfillService();
-        var userService = Substitute.For<IUserService>();
-
-        roleService.GetByNameAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(new BzsRole { Id = Guid.NewGuid(), Name = IdentitySeedConstants.AdminRoleName });
-        rolePermissionService.SyncPermissionsAsync(Arg.Any<Guid>(), Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(IdentityResult.Success));
-
-        var existingAdmin = new BzsUser
-        {
-            Id = Guid.NewGuid(),
-            UserName = "admin",
-        };
-
-        userService.GetByNameAsync("admin", Arg.Any<CancellationToken>())
-            .Returns(existingAdmin);
-        userService.EnsurePasswordAsync(existingAdmin.Id, "admin123", Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(IdentityResult.Success));
-        userService.IsInRoleAsync(default, default!, default)
-            .ReturnsForAnyArgs(Task.FromResult(true));
-
-        var options = Options.Create(new IdentitySeedOptions
-        {
-            Admin = new SeedAdminOptions
+        var topology = Substitute.For<IPermissionTopology>();
+        topology.InitializeDefaultsAsync(
+            Arg.Any<IEnumerable<PermissionTopologySeedResource>>(),
+            Arg.Any<IEnumerable<string>>(),
+            Arg.Any<IReadOnlyDictionary<string, string[]>>(),
+            Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        var users = Substitute.For<IUserService>();
+        users.GetByNameAsync("admin", Arg.Any<CancellationToken>()).Returns(new BzsUser { Id = Guid.NewGuid(), UserName = "admin" });
+        users.EnsurePasswordAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(IdentityResult.Success);
+        users.IsInRoleAsync(Arg.Any<Guid>(), IdentitySeedConstants.AdminRoleName, Arg.Any<CancellationToken>()).Returns(true);
+        var seed = new IdentitySeeder(topology, Substitute.For<IOidcScopeService>(), CreateOidcClientPermissionBackfillService(), users,
+            Options.Create(new IdentitySeedOptions
             {
-                UserName = "admin",
-                Password = "admin123",
-            },
-            InitialRoles = [IdentitySeedConstants.UserRoleName],
-            RolePermissions = new Dictionary<string, string[]>
-            {
-                [IdentitySeedConstants.UserRoleName] = ["users.read.self"],
-            },
-            PermissionCatalog = [new() { ResourceKey = "api", Permissions = [new() { Name = "users.read.self", ReleaseScopes = ["api"] }] }],
-        });
-        var configuration = new ConfigurationBuilder().Build();
+                Admin = new SeedAdminOptions { UserName = "admin", Password = "password" },
+                InitialRoles = ["operators"],
+            }),
+            new ConfigurationBuilder().Build(), NullLogger<IdentitySeeder>.Instance);
 
-        var sut = new IdentitySeeder(
-            roleService,
-            rolePermissionService,
-            permissionCatalogService,
-            oidcScopeService,
-            oidcClientPermissionBackfillService,
-            userService,
-            options,
-            configuration,
-            NullLogger<IdentitySeeder>.Instance);
+        await seed.SeedAsync();
 
-        await sut.SeedAsync();
-
-        await permissionCatalogService.Received(1)
-            .InitializeDefaultsAsync(options.Value.PermissionCatalog, Arg.Any<CancellationToken>());
-        await oidcScopeService.Received(1)
-            .InitializeDefaultsIfMissingAsync(options.Value.AdditionalScopes, Arg.Any<CancellationToken>());
-        await userService.Received(1)
-            .EnsurePasswordAsync(existingAdmin.Id, "admin123", Arg.Any<CancellationToken>());
-        await userService.DidNotReceive()
-            .CreateAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
-        await userService.DidNotReceive()
-            .AddToRoleAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await topology.Received(1).InitializeDefaultsAsync(
+            Arg.Any<IEnumerable<PermissionTopologySeedResource>>(),
+            Arg.Is<IEnumerable<string>>(roles => roles.Contains("operators", StringComparer.OrdinalIgnoreCase)),
+            Arg.Is<IReadOnlyDictionary<string, string[]>>(roles =>
+                roles.ContainsKey(IdentitySeedConstants.AdminRoleName) &&
+                !roles.ContainsKey("operators")),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task SeedAsync_WhenAdminMissing_CreatesUserAndAssignsAdminRole()
     {
-        var roleService = Substitute.For<IRoleService>();
-        var rolePermissionService = Substitute.For<IRolePermissionService>();
-        var permissionCatalogService = Substitute.For<IPermissionCatalogService>();
-        var oidcScopeService = Substitute.For<IOidcScopeService>();
-        var oidcClientPermissionBackfillService = CreateOidcClientPermissionBackfillService();
-        var userService = Substitute.For<IUserService>();
-
-        roleService.GetByNameAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(new BzsRole { Id = Guid.NewGuid(), Name = IdentitySeedConstants.AdminRoleName });
-        rolePermissionService.SyncPermissionsAsync(Arg.Any<Guid>(), Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(IdentityResult.Success));
-
+        var topology = Substitute.For<IPermissionTopology>();
+        var users = Substitute.For<IUserService>();
         var createdAdmin = new BzsUser
         {
             Id = Guid.NewGuid(),
             UserName = "admin",
         };
-
-        userService.GetByNameAsync("admin", Arg.Any<CancellationToken>())
+        users.GetByNameAsync("admin", Arg.Any<CancellationToken>())
             .Returns((BzsUser?)null, createdAdmin);
-        userService.CreateAsync("admin", "admin123", Arg.Any<string?>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(IdentityResult.Success));
-        userService.EnsurePasswordAsync(createdAdmin.Id, "admin123", Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(IdentityResult.Success));
-        userService.IsInRoleAsync(default, default!, default)
-            .ReturnsForAnyArgs(Task.FromResult(false));
-        userService.AddToRoleAsync(default, default!, default)
-            .ReturnsForAnyArgs(Task.FromResult(IdentityResult.Success));
-
-        var options = Options.Create(new IdentitySeedOptions
-        {
-            Admin = new SeedAdminOptions
+        users.CreateAsync("admin", "admin123", Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(IdentityResult.Success);
+        users.EnsurePasswordAsync(createdAdmin.Id, "admin123", Arg.Any<CancellationToken>())
+            .Returns(IdentityResult.Success);
+        users.IsInRoleAsync(createdAdmin.Id, IdentitySeedConstants.AdminRoleName, Arg.Any<CancellationToken>())
+            .Returns(false);
+        users.AddToRoleAsync(createdAdmin.Id, IdentitySeedConstants.AdminRoleName, Arg.Any<CancellationToken>())
+            .Returns(IdentityResult.Success);
+        var seed = new IdentitySeeder(
+            topology,
+            Substitute.For<IOidcScopeService>(),
+            CreateOidcClientPermissionBackfillService(),
+            users,
+            Options.Create(new IdentitySeedOptions
             {
-                UserName = "admin",
-                Password = "admin123",
-            },
-            InitialRoles = [IdentitySeedConstants.UserRoleName],
-            RolePermissions = new Dictionary<string, string[]>
-            {
-                [IdentitySeedConstants.UserRoleName] = ["users.read.self"],
-            },
-            PermissionCatalog = [new() { ResourceKey = "api", Permissions = [new() { Name = "users.read.self", ReleaseScopes = ["api"] }] }],
-        });
-        var configuration = new ConfigurationBuilder().Build();
-
-        var sut = new IdentitySeeder(
-            roleService,
-            rolePermissionService,
-            permissionCatalogService,
-            oidcScopeService,
-            oidcClientPermissionBackfillService,
-            userService,
-            options,
-            configuration,
+                Admin = new SeedAdminOptions
+                {
+                    UserName = "admin",
+                    Password = "admin123",
+                },
+            }),
+            new ConfigurationBuilder().Build(),
             NullLogger<IdentitySeeder>.Instance);
 
-        await sut.SeedAsync();
+        await seed.SeedAsync();
 
-        await userService.Received(1)
-            .CreateAsync("admin", "admin123", Arg.Any<string?>(), Arg.Any<CancellationToken>());
-        await userService.Received(1)
-            .EnsurePasswordAsync(createdAdmin.Id, "admin123", Arg.Any<CancellationToken>());
-        await userService.Received(1)
-            .AddToRoleAsync(createdAdmin.Id, IdentitySeedConstants.AdminRoleName, Arg.Any<CancellationToken>());
+        await users.Received(1).CreateAsync("admin", "admin123", Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await users.Received(1).EnsurePasswordAsync(createdAdmin.Id, "admin123", Arg.Any<CancellationToken>());
+        await users.Received(1).AddToRoleAsync(createdAdmin.Id, IdentitySeedConstants.AdminRoleName, Arg.Any<CancellationToken>());
     }
 
     private static OidcClientPermissionBackfillService CreateOidcClientPermissionBackfillService()

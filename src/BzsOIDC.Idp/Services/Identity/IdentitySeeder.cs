@@ -5,9 +5,7 @@ using Microsoft.Extensions.Options;
 namespace BzsOIDC.Idp.Services.Identity;
 
 internal sealed class IdentitySeeder(
-    IRoleService roleService,
-    IRolePermissionService rolePermissionService,
-    IPermissionCatalogService permissionCatalogService,
+    IPermissionTopology permissionTopology,
     IOidcScopeService oidcScopeService,
     OidcClientPermissionBackfillService oidcClientPermissionBackfillService,
     IUserService userService,
@@ -47,27 +45,31 @@ internal sealed class IdentitySeeder(
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        foreach (var roleName in configuredRoles)
+        var rolePermissions = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (roleName, permissions) in options.RolePermissions)
         {
-            var existingRole = await roleService.GetByNameAsync(roleName, cancellationToken);
-            if (existingRole is not null)
-            {
-                continue;
-            }
-
-            var roleResult = await roleService.CreateAsync(roleName, cancellationToken);
-            if (IsSuccessOrExpectedConflict(roleResult, "DuplicateRoleName"))
-            {
-                logger.LogInformation("Identity seeding ensured role exists: {RoleName}", roleName);
-                continue;
-            }
-
-            EnsureSuccess(roleResult, $"创建角色 '{roleName}'");
+            rolePermissions[roleName] = permissions;
         }
 
-        await permissionCatalogService.InitializeDefaultsAsync(options.PermissionCatalog, cancellationToken);
+        rolePermissions[IdentitySeedConstants.AdminRoleName] = options.RolePermissions.Values
+            .SelectMany(static permissions => permissions)
+            .Concat(options.PermissionCatalog.SelectMany(static resource => resource.Permissions).Select(static permission => permission.Name))
+            .Where(static permission => !string.IsNullOrWhiteSpace(permission))
+            .Select(static permission => permission.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        await permissionTopology.InitializeDefaultsAsync(options.PermissionCatalog, configuredRoles, rolePermissions, cancellationToken);
+        foreach (var roleName in configuredRoles)
+        {
+            logger.LogInformation("Identity seeding ensured role exists: {RoleName}", roleName);
+        }
+
+        foreach (var roleName in rolePermissions.Keys)
+        {
+            logger.LogInformation("Identity seeding synchronized permissions for role: {RoleName}", roleName);
+        }
         await oidcScopeService.InitializeDefaultsIfMissingAsync(options.AdditionalScopes, cancellationToken);
-        await SeedRolePermissionsAsync(options, cancellationToken);
 
         var adminUser = await userService.GetByNameAsync(adminUserName, cancellationToken);
         if (adminUser is null)
@@ -103,45 +105,6 @@ internal sealed class IdentitySeeder(
         }
 
         await oidcClientPermissionBackfillService.EnsureBackfilledAsync(cancellationToken);
-    }
-
-    /// <summary>
-    /// 执行初始化种子逻辑。
-    /// </summary>
-    /// <param name="options">参数options。</param>
-    /// <param name="cancellationToken">参数cancellationToken。</param>
-    /// <returns>执行结果。</returns>
-    private async Task SeedRolePermissionsAsync(IdentitySeedOptions options, CancellationToken cancellationToken)
-    {
-        var allConfiguredPermissions = options.RolePermissions.Values
-            .SelectMany(static permissions => permissions)
-            .Where(static permission => !string.IsNullOrWhiteSpace(permission))
-            .Select(static permission => permission.Trim())
-            .Concat(options.PermissionCatalog
-                .SelectMany(static resource => resource.Permissions)
-                .Select(static permission => permission.Name)
-                .Where(static permission => !string.IsNullOrWhiteSpace(permission))
-                .Select(static permission => permission.Trim()))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        var rolePermissionMap = new Dictionary<string, string[]>(options.RolePermissions, StringComparer.OrdinalIgnoreCase)
-        {
-            [IdentitySeedConstants.AdminRoleName] = allConfiguredPermissions,
-        };
-
-        foreach (var (roleName, permissions) in rolePermissionMap)
-        {
-            var role = await roleService.GetByNameAsync(roleName, cancellationToken);
-            if (role is null)
-            {
-                throw new InvalidOperationException($"角色 '{roleName}' 不存在，无法初始化权限。");
-            }
-
-            var syncResult = await rolePermissionService.SyncPermissionsAsync(role.Id, permissions, cancellationToken);
-            EnsureSuccess(syncResult, $"同步角色 '{roleName}' 的权限");
-            logger.LogInformation("Identity seeding synchronized permissions for role: {RoleName}", roleName);
-        }
     }
 
     /// <summary>

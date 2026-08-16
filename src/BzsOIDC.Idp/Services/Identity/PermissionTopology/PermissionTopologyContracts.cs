@@ -1,14 +1,14 @@
 namespace BzsOIDC.Idp.Services.Identity;
 
-public sealed record PermissionCatalogSeedResource
+public sealed record PermissionTopologySeedResource
 {
     public string ResourceKey { get; init; } = string.Empty;
     public string? DisplayName { get; init; }
     public string? Description { get; init; }
-    public PermissionCatalogSeedPermission[] Permissions { get; init; } = [];
+    public PermissionTopologySeedPermission[] Permissions { get; init; } = [];
 }
 
-public sealed record PermissionCatalogSeedPermission
+public sealed record PermissionTopologySeedPermission
 {
     public string Name { get; init; } = string.Empty;
     public string? DisplayName { get; init; }
@@ -62,32 +62,54 @@ public sealed record RolePermissionAssignmentResponse
     public bool Assigned { get; init; }
 }
 
-public enum PermissionCatalogCommandStatus
+public sealed record RoleResponse
+{
+    public Guid Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string NormalizedName { get; init; } = string.Empty;
+    public bool IsProtected { get; init; }
+    public int PermissionCount { get; init; }
+    public string[] Permissions { get; init; } = [];
+}
+
+public sealed record RoleUpsertRequest
+{
+    public string Name { get; init; } = string.Empty;
+}
+
+public sealed record RolePermissionSyncRequest
+{
+    public string[] Permissions { get; init; } = [];
+}
+
+public enum PermissionTopologyCommandStatus
 {
     Success,
     ValidationFailed,
     NotFound,
     Conflict,
+    Protected,
 }
 
-public sealed record PermissionCatalogCommandResult<T>
+public sealed record PermissionTopologyCommandResult<T>
 {
-    public PermissionCatalogCommandStatus Status { get; init; }
+    public PermissionTopologyCommandStatus Status { get; init; }
     public T? Value { get; init; }
     public string[] Errors { get; init; } = [];
-
-    public static PermissionCatalogCommandResult<T> Success(T value)
+    public static PermissionTopologyCommandResult<T> Success(T value)
     {
-        return new PermissionCatalogCommandResult<T>
+        return new PermissionTopologyCommandResult<T>
         {
-            Status = PermissionCatalogCommandStatus.Success,
+            Status = PermissionTopologyCommandStatus.Success,
             Value = value,
         };
     }
 
-    public static PermissionCatalogCommandResult<T> Failure(PermissionCatalogCommandStatus status, params string[] errors)
+    public static PermissionTopologyCommandResult<T> Failure(
+        PermissionTopologyCommandStatus status,
+        params string[] errors)
     {
-        return new PermissionCatalogCommandResult<T>
+        return new PermissionTopologyCommandResult<T>
         {
             Status = status,
             Errors = errors,

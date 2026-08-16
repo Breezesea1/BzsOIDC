@@ -8,9 +8,9 @@ namespace BzsOIDC.Idp.Services.Identity;
 
 internal sealed class PermissionClaimsPrincipalFactory(
     UserManager<BzsUser> userManager,
-    RoleManager<BzsRole> roleManager,
-    IOptions<IdentityOptions> optionsAccessor)
-    : UserClaimsPrincipalFactory<BzsUser, BzsRole>(userManager, roleManager, optionsAccessor)
+    IOptions<IdentityOptions> optionsAccessor,
+    IPermissionTopology permissionTopology)
+    : UserClaimsPrincipalFactory<BzsUser>(userManager, optionsAccessor)
 {
     /// <summary>
     /// 生成结果。
@@ -43,21 +43,14 @@ internal sealed class PermissionClaimsPrincipalFactory(
             {
                 identity.AddClaim(new Claim(identity.RoleClaimType, roleName));
             }
+        }
 
-            var role = await RoleManager.FindByNameAsync(roleName);
-            if (role is null)
+        var rolePermissions = await permissionTopology.ResolveRolePermissionsAsync(roleNames);
+        foreach (var permission in rolePermissions)
+        {
+            if (existingPermissions.Add(permission))
             {
-                continue;
-            }
-
-            var roleClaims = await RoleManager.GetClaimsAsync(role);
-            foreach (var permissionClaim in roleClaims.Where(static c =>
-                         string.Equals(c.Type, PermissionConstants.ClaimType, StringComparison.OrdinalIgnoreCase)))
-            {
-                if (existingPermissions.Add(permissionClaim.Value))
-                {
-                    identity.AddClaim(permissionClaim);
-                }
+                identity.AddClaim(new Claim(PermissionConstants.ClaimType, permission));
             }
         }
 

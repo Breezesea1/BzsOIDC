@@ -5,8 +5,7 @@
 @using Microsoft.AspNetCore.WebUtilities
 @using Microsoft.Extensions.Localization
 @inject IHttpContextAccessor HttpContextAccessor
-@inject IRoleManagementService RoleManagementService
-@inject IPermissionCatalogService PermissionCatalogService
+@inject IPermissionTopology PermissionTopology
 @inject IStringLocalizer<RoleManagement> L
 @inject NavigationManager NavigationManager
 @layout BzsOIDC.Idp.Client.Components.Layout.MainLayout
@@ -281,9 +280,9 @@ else
         try
         {
             _roles.Clear();
-            _roles.AddRange(await RoleManagementService.GetAllAsync());
+            _roles.AddRange(await PermissionTopology.GetAllRolesAsync());
             _resources.Clear();
-            _resources.AddRange(await PermissionCatalogService.GetResourcesAsync());
+            _resources.AddRange(await PermissionTopology.GetResourcesAsync());
             _selectedRoleId ??= _roles.FirstOrDefault()?.Id;
             await LoadSelectedRoleAsync();
         }
@@ -302,11 +301,11 @@ else
             return;
         }
 
-        var role = await RoleManagementService.GetByIdAsync(_selectedRoleId.Value);
+        var role = await PermissionTopology.GetRoleByIdAsync(_selectedRoleId.Value);
         if (role is null)
         {
             _selectedRoleId = _roles.FirstOrDefault()?.Id;
-            role = _selectedRoleId is null ? null : await RoleManagementService.GetByIdAsync(_selectedRoleId.Value);
+            role = _selectedRoleId is null ? null : await PermissionTopology.GetRoleByIdAsync(_selectedRoleId.Value);
         }
 
         _selectedRoleName = role?.Name ?? string.Empty;
@@ -325,9 +324,9 @@ else
 
     private async Task CreateRoleAsync()
     {
-        var result = await RoleManagementService.CreateAsync(new RoleUpsertRequest { Name = _newRoleName });
+        var result = await PermissionTopology.CreateRoleAsync(new RoleUpsertRequest { Name = _newRoleName });
         await ApplyRoleResultAsync(result, L["RoleCreated"].Value);
-        if (result.Status == RoleManagementCommandStatus.Success)
+        if (result.Status == PermissionTopologyCommandStatus.Success)
         {
             _newRoleName = string.Empty;
             _selectedRoleId = result.Value!.Id;
@@ -341,7 +340,7 @@ else
             return;
         }
 
-        var result = await RoleManagementService.UpdateAsync(_selectedRoleId.Value, new RoleUpsertRequest { Name = _selectedRoleName });
+        var result = await PermissionTopology.UpdateRoleAsync(_selectedRoleId.Value, new RoleUpsertRequest { Name = _selectedRoleName });
         await ApplyRoleResultAsync(result, L["RoleRenamed"].Value);
     }
 
@@ -352,9 +351,9 @@ else
             return;
         }
 
-        var result = await RoleManagementService.DeleteAsync(_selectedRoleId.Value);
+        var result = await PermissionTopology.DeleteRoleAsync(_selectedRoleId.Value);
         await ApplyRoleResultAsync(result, L["RoleDeleted"].Value);
-        if (result.Status == RoleManagementCommandStatus.Success)
+        if (result.Status == PermissionTopologyCommandStatus.Success)
         {
             _selectedRoleId = null;
         }
@@ -367,18 +366,18 @@ else
             return;
         }
 
-        var result = await RoleManagementService.SyncPermissionsAsync(_selectedRoleId.Value, _selectedPermissions);
-        _statusIsError = result.Status != RoleManagementCommandStatus.Success;
-        _statusMessage = result.Status == RoleManagementCommandStatus.Success
+        var result = await PermissionTopology.SyncRolePermissionsAsync(_selectedRoleId.Value, _selectedPermissions);
+        _statusIsError = result.Status != PermissionTopologyCommandStatus.Success;
+        _statusMessage = result.Status == PermissionTopologyCommandStatus.Success
             ? L["PermissionsSaved"].Value
             : string.Join(Environment.NewLine, result.Errors);
         await LoadAsync();
     }
 
-    private async Task ApplyRoleResultAsync(RoleManagementCommandResult<RoleResponse> result, string successMessage)
+    private async Task ApplyRoleResultAsync(PermissionTopologyCommandResult<RoleResponse> result, string successMessage)
     {
-        _statusIsError = result.Status != RoleManagementCommandStatus.Success;
-        _statusMessage = result.Status == RoleManagementCommandStatus.Success
+        _statusIsError = result.Status != PermissionTopologyCommandStatus.Success;
+        _statusMessage = result.Status == PermissionTopologyCommandStatus.Success
             ? successMessage
             : string.Join(Environment.NewLine, result.Errors);
         await LoadAsync();

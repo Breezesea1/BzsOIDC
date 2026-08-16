@@ -89,4 +89,5 @@
   <data name="EmailMustBeValid" xml:space="preserve"><value>Email must be a valid address.</value></data>
   <data name="CannotRemoveCurrentSessionAdminAccess" xml:space="preserve"><value>You cannot remove admin access from the account used for the current session.</value></data>
   <data name="SavedUserCouldNotBeReloaded" xml:space="preserve"><value>The saved user could not be reloaded from the database.</value></data>
+  <data name="IdentityOperationFailed" xml:space="preserve"><value>The user operation could not be completed.</value></data>
 </root>
