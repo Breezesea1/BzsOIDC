@@ -52,6 +52,30 @@ public sealed class OidcClientResponse
     public string[] PostLogoutRedirectUris { get; init; } = [];
     public string[] Permissions { get; init; } = [];
     public string[] Requirements { get; init; } = [];
+    public string ETag { get; init; } = string.Empty;
+}
+
+public sealed class OidcClientListQuery
+{
+    public string? Search { get; init; }
+    public int Page { get; init; } = 1;
+    public int PageSize { get; init; } = 25;
+    public string? Sort { get; init; } = "clientId";
+    public string? Direction { get; init; } = "asc";
+}
+
+public sealed class OidcClientListResponse
+{
+    public IReadOnlyList<OidcClientResponse> Items { get; init; } = [];
+    public int TotalCount { get; init; }
+    public int Page { get; init; }
+    public int PageSize { get; init; }
+}
+
+public sealed class OidcClientSecretResponse
+{
+    public string ClientId { get; init; } = string.Empty;
+    public string ClientSecret { get; init; } = string.Empty;
 }
 
 public sealed class OidcClientRegistrationResponse
@@ -60,6 +84,7 @@ public sealed class OidcClientRegistrationResponse
     public string? ClientSecret { get; init; }
     public string DisplayName { get; init; } = string.Empty;
     public OidcClientAuthFlow AuthFlow { get; init; }
+    public string ETag { get; init; } = string.Empty;
 }
 
 public enum OidcClientAuthFlow
@@ -82,6 +107,7 @@ public enum OidcClientCommandStatus
     ValidationFailed,
     Conflict,
     NotFound,
+    ConcurrencyConflict,
 }
 
 public sealed class OidcClientCommandResult<T>

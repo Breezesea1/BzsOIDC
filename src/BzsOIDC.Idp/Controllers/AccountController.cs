@@ -68,7 +68,7 @@ public sealed class AccountController(
     }
 
     [HttpPost("logout")]
-    [IgnoreAntiforgeryToken]
+    [ValidateAntiForgeryToken]
     public IActionResult Logout([FromQuery] string? returnUrl)
     {
         return SignOut(

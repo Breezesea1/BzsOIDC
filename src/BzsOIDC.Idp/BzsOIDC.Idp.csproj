@@ -16,11 +16,8 @@
     <ItemGroup>
         <PackageReference Include="AspNet.Security.OAuth.GitHub" Version="10.0.0" />
         <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.4.6" />
-        <PackageReference Include="BootstrapBlazor" Version="10.7.0" />
-        <PackageReference Include="Microsoft.AspNetCore.Components.QuickGrid" Version="10.0.11" />
         <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.11" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
-        <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.11" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.11" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -32,42 +29,10 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\BzsOIDC.Contracts\BzsOIDC.Contracts.csproj" />
         <ProjectReference Include="..\BzsOIDC.Idp.Client\BzsOIDC.Idp.Client.csproj" />
         <ProjectReference Include="..\BzsOIDC.AppHost.ServiceDefaults\BzsOIDC.AppHost.ServiceDefaults.csproj" />
         <ProjectReference Include="..\Shared\BzsOIDC.Shared.Infrastructure\BzsOIDC.Shared.Infrastructure.csproj" />
     </ItemGroup>
-
-    <ItemGroup>
-        <RazorComponent Remove="Components\Pages\**\*.razor" />
-        <RazorComponent Remove="Components\Layout\**\*.razor" />
-    </ItemGroup>
-
-    <ItemGroup>
-        <Content Remove="package.json" />
-        <None Include="package.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
-        <Content Remove="package-lock.json" />
-        <None Include="package-lock.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never">
-            <DependentUpon>package.json</DependentUpon>
-        </None>
-        <Content Remove="wwwroot\js\dev\**\*" />
-        <None Include="wwwroot\js\dev\**\*" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
-        <Content Remove="wwwroot\css\app-dev.css" />
-        <None Include="wwwroot\css\app-dev.css" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
-        <Content Remove="wwwroot\css\tailwind.config.js" />
-        <None Include="wwwroot\css\tailwind.config.js" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
-        <Content Remove="scripts\**\*" />
-        <None Remove="scripts\**\*" />
-
-    </ItemGroup>
-
-    <Target Name="NpmRestore" Condition="Exists('$(MSBuildProjectDirectory)/package.json')" BeforeTargets="Build;Publish">
-        <Exec Command="npm ci" WorkingDirectory="$(MSBuildProjectDirectory)" Condition="Exists('$(MSBuildProjectDirectory)/package-lock.json') And (!Exists('$(MSBuildProjectDirectory)/node_modules/tailwindcss/package.json') Or !Exists('$(MSBuildProjectDirectory)/node_modules/gsap/package.json'))" />
-        <Exec Command="npm install" WorkingDirectory="$(MSBuildProjectDirectory)" Condition="!Exists('$(MSBuildProjectDirectory)/package-lock.json') And (!Exists('$(MSBuildProjectDirectory)/node_modules/tailwindcss/package.json') Or !Exists('$(MSBuildProjectDirectory)/node_modules/gsap/package.json'))" />
-    </Target>
-
-    <Target Name="BuildFrontendAssets" Condition="Exists('$(MSBuildProjectDirectory)/package.json')" DependsOnTargets="NpmRestore" BeforeTargets="Build;Publish">
-        <Exec Command="npm run css:build" WorkingDirectory="$(MSBuildProjectDirectory)" />
-        <Exec Command="npm run gsap:copy" WorkingDirectory="$(MSBuildProjectDirectory)" />
-    </Target>
 
 </Project>

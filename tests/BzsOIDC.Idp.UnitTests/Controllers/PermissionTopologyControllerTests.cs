@@ -1,6 +1,8 @@
 using BzsOIDC.Idp.Controllers;
 using BzsOIDC.Idp.Services.Identity;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 using NSubstitute;
 
 namespace BzsOIDC.Idp.UnitTests.Controllers;
@@ -73,6 +75,70 @@ public sealed class PermissionTopologyControllerTests
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var payload = Assert.IsType<PermissionDefinitionResponse>(ok.Value);
         Assert.Equal("orders.read", payload.Name);
+    }
+
+    [Fact]
+    public async Task UpsertResource_WhenIfMatchMissing_ReturnsPreconditionRequiredProblem()
+    {
+        var service = Substitute.For<IPermissionTopology>();
+        service.GetResourceAsync("orders-api", Arg.Any<CancellationToken>())
+            .Returns(new ProtectedResourceResponse { Key = "orders-api", ETag = "\"current\"" });
+        var sut = WithHttpContext(new PermissionTopologyController(service));
+
+        var result = await sut.UpsertResource("orders-api", new ProtectedResourceUpsertRequest(), CancellationToken.None);
+
+        var problem = Assert.IsType<ProblemDetails>(Assert.IsType<ObjectResult>(result.Result).Value);
+        Assert.Equal(StatusCodes.Status428PreconditionRequired, problem.Status);
+        Assert.Equal("precondition_required", problem.Extensions["code"]);
+    }
+
+    [Fact]
+    public async Task UpsertPermission_WhenIfMatchStale_ReturnsConcurrencyConflictProblem()
+    {
+        var service = Substitute.For<IPermissionTopology>();
+        service.GetPermissionAsync("orders.read", Arg.Any<CancellationToken>()).Returns(new PermissionDefinitionResponse { ETag = "\"current\"" });
+        var sut = WithHttpContext(new PermissionTopologyController(service));
+        sut.ControllerContext.HttpContext.Request.Headers[HeaderNames.IfMatch] = "\"stale\"";
+
+        var result = await sut.UpsertPermission("orders-api", "orders.read", new PermissionDefinitionUpsertRequest(), CancellationToken.None);
+
+        var problem = Assert.IsType<ProblemDetails>(Assert.IsType<ObjectResult>(result.Result).Value);
+        Assert.Equal(StatusCodes.Status412PreconditionFailed, problem.Status);
+        Assert.Equal("concurrency_conflict", problem.Extensions["code"]);
+    }
+
+    [Fact]
+    public async Task SyncReleaseScopes_WhenIfMatchMatches_ReturnsUpdatedEtag()
+    {
+        var service = Substitute.For<IPermissionTopology>();
+        service.GetPermissionAsync("orders.read", Arg.Any<CancellationToken>()).Returns(new PermissionDefinitionResponse { ETag = "\"current\"" });
+        var updated = new PermissionDefinitionResponse { Name = "orders.read", ETag = "\"updated\"" };
+        service.SyncReleaseScopesAsync("orders.read", Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(PermissionTopologyCommandResult<PermissionDefinitionResponse>.Success(updated));
+        var sut = WithHttpContext(new PermissionTopologyController(service));
+        sut.ControllerContext.HttpContext.Request.Headers[HeaderNames.IfMatch] = "\"current\"";
+
+        var result = await sut.SyncReleaseScopes("orders.read", new PermissionReleaseScopesUpsertRequest { Scopes = ["api"] }, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal("\"updated\"", sut.Response.Headers[HeaderNames.ETag].ToString());
+    }
+
+    [Fact]
+    public void PermissionTopologyMutations_RequireAntiforgery()
+    {
+        Assert.NotNull(typeof(PermissionTopologyController).GetMethod(nameof(PermissionTopologyController.UpsertResource))
+            ?.GetCustomAttributes(typeof(ValidateAntiForgeryTokenAttribute), inherit: true).SingleOrDefault());
+        Assert.NotNull(typeof(PermissionTopologyController).GetMethod(nameof(PermissionTopologyController.UpsertPermission))
+            ?.GetCustomAttributes(typeof(ValidateAntiForgeryTokenAttribute), inherit: true).SingleOrDefault());
+        Assert.NotNull(typeof(PermissionTopologyController).GetMethod(nameof(PermissionTopologyController.SyncReleaseScopes))
+            ?.GetCustomAttributes(typeof(ValidateAntiForgeryTokenAttribute), inherit: true).SingleOrDefault());
+    }
+
+    private static PermissionTopologyController WithHttpContext(PermissionTopologyController controller)
+    {
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        return controller;
     }
 
     [Fact]

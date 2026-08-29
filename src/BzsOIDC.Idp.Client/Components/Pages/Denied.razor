@@ -1,0 +1,23 @@
+@page "/account/denied"
+@inject NavigationManager Navigation
+
+<PageTitle>Access denied</PageTitle>
+<main class="auth-page denied-page" data-testid="wasm-denied">
+    <h1>Access denied</h1>
+    <p>Your account is signed in, but it does not have permission to view this resource.</p>
+    <a href="@HomeHref">Return home</a>
+    <a href="@LoginHref">Switch account</a>
+</main>
+
+@code {
+    private string ClientPath(string path)
+    {
+        var basePath = new Uri(Navigation.BaseUri, UriKind.Absolute).AbsolutePath.TrimEnd('/');
+        return string.IsNullOrEmpty(path)
+            ? (string.IsNullOrEmpty(basePath) ? "/" : $"{basePath}/")
+            : (string.IsNullOrEmpty(basePath) ? $"/{path}" : $"{basePath}/{path}");
+    }
+
+    private string HomeHref => ClientPath(string.Empty);
+    private string LoginHref => ClientPath("login");
+}

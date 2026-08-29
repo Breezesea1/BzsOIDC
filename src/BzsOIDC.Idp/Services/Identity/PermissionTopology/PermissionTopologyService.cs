@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using BzsOIDC.Idp.Infra;
 using BzsOIDC.Idp.Models;
 using BzsOIDC.Shared.Infrastructure.Authorization;
@@ -119,6 +121,34 @@ internal sealed class PermissionTopologyService(
         return roles.Select(role => ToRoleResponse(role, permissions, includePermissions: false)).ToArray();
     }
 
+    public async Task<RoleListResponse> ListRolesAsync(RoleListQuery query, CancellationToken cancellationToken = default)
+    {
+        var page = Math.Max(1, query.Page);
+        var pageSize = Math.Clamp(query.PageSize <= 0 ? 25 : query.PageSize, 1, 100);
+        var roles = await GetAllRolesAsync(cancellationToken);
+        IEnumerable<RoleResponse> filtered = roles;
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var search = query.Search.Trim();
+            filtered = filtered.Where(role => role.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
+        }
+
+        filtered = query.Sort?.ToLowerInvariant() switch
+        {
+            "permissioncount" => query.Descending ? filtered.OrderByDescending(role => role.PermissionCount).ThenBy(role => role.Id) : filtered.OrderBy(role => role.PermissionCount).ThenBy(role => role.Id),
+            _ => query.Descending ? filtered.OrderByDescending(role => role.Name, StringComparer.OrdinalIgnoreCase).ThenBy(role => role.Id) : filtered.OrderBy(role => role.Name, StringComparer.OrdinalIgnoreCase).ThenBy(role => role.Id),
+        };
+
+        var materialized = filtered.ToArray();
+        return new RoleListResponse
+        {
+            Items = materialized.Skip((page - 1) * pageSize).Take(pageSize).ToArray(),
+            TotalCount = materialized.Length,
+            Page = page,
+            PageSize = pageSize,
+        };
+    }
+
     public async Task<RoleResponse?> GetRoleByIdAsync(Guid roleId, CancellationToken cancellationToken = default)
     {
         var role = await dbContext.Roles.AsNoTracking().FirstOrDefaultAsync(role => role.Id == roleId, cancellationToken);
@@ -191,6 +221,7 @@ internal sealed class PermissionTopologyService(
         if (existing is not null && existing.Id != role.Id) return PermissionTopologyCommandResult<RoleResponse>.Failure(PermissionTopologyCommandStatus.Conflict, $"角色 '{name}' 已存在");
         role.Name = name;
         role.NormalizedName = policy.NormalizeKey(name);
+        role.ConcurrencyStamp = Guid.NewGuid().ToString();
         var result = await roleManager.UpdateAsync(role);
         return result.Succeeded
             ? PermissionTopologyCommandResult<RoleResponse>.Success(ToRoleResponse(role, await GetPermissionsByRoleAsync(cancellationToken), true))
@@ -264,6 +295,14 @@ internal sealed class PermissionTopologyService(
                             return;
                         }
                     }
+                }
+
+                role.ConcurrencyStamp = Guid.NewGuid().ToString();
+                var roleUpdate = await roleManager.UpdateAsync(role);
+                if (!roleUpdate.Succeeded)
+                {
+                    commandResult = FromIdentityFailure<IReadOnlyList<string>>(roleUpdate);
+                    return;
                 }
 
                 await transaction.CommitAsync(cancellationToken);
@@ -446,6 +485,7 @@ internal sealed class PermissionTopologyService(
         DisplayName = resource.DisplayName,
         Description = resource.Description,
         IsActive = resource.IsActive,
+        ETag = ComputeETag(resource),
         Permissions = resource.Permissions.OrderBy(static permission => permission.Name, StringComparer.OrdinalIgnoreCase).Select(permission => ToResponse(permission, roleAssignments)).ToArray(),
     };
 
@@ -456,14 +496,41 @@ internal sealed class PermissionTopologyService(
         DisplayName = permission.DisplayName,
         Description = permission.Description,
         IsActive = permission.IsActive,
+        ETag = ComputeETag(permission),
         ReleaseScopes = permission.ReleaseScopes.Select(static scope => scope.Scope).OrderBy(static scope => scope, StringComparer.OrdinalIgnoreCase).ToArray(),
         AssignedRoles = roleAssignments.TryGetValue(permission.Name, out var roles) ? roles : [],
     };
 
+    private static string ComputeETag(ProtectedResource resource)
+    {
+        var value = $"{resource.Id:N}|{resource.Key}|{resource.DisplayName}|{resource.Description}|{resource.IsActive}";
+        return ToETag(value);
+    }
+
+    private static string ComputeETag(PermissionDefinition permission)
+    {
+        var scopes = string.Join(',', permission.ReleaseScopes.Select(static scope => scope.Scope).OrderBy(static scope => scope, StringComparer.OrdinalIgnoreCase));
+        var value = $"{permission.Id:N}|{permission.ResourceId:N}|{permission.Name}|{permission.DisplayName}|{permission.Description}|{permission.IsActive}|{scopes}";
+        return ToETag(value);
+    }
+
+    private static string ToETag(string value)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+        return $"\"{Convert.ToBase64String(hash).TrimEnd('=').Replace('+', '-').Replace('/', '_')}\"";
+    }
+
     private RoleResponse ToRoleResponse(BzsRole role, IReadOnlyDictionary<Guid, string[]> permissionsByRole, bool includePermissions)
     {
         var permissions = permissionsByRole.TryGetValue(role.Id, out var values) ? values : [];
-        return new RoleResponse { Id = role.Id, Name = role.Name ?? role.Id.ToString(), NormalizedName = role.NormalizedName ?? string.Empty, IsProtected = policy.IsProtectedRole(role), PermissionCount = permissions.Length, Permissions = includePermissions ? permissions : [] };
+        return new RoleResponse { Id = role.Id, Name = role.Name ?? role.Id.ToString(), NormalizedName = role.NormalizedName ?? string.Empty, IsProtected = policy.IsProtectedRole(role), PermissionCount = permissions.Length, Permissions = includePermissions ? permissions : [], ETag = ComputeETag(role, permissions) };
+    }
+
+    private static string ComputeETag(BzsRole role, IReadOnlyCollection<string> permissions)
+    {
+        var value = $"{role.Id:N}|{role.ConcurrencyStamp}|{string.Join(',', permissions.OrderBy(static permission => permission, StringComparer.OrdinalIgnoreCase))}";
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+        return $"\"{Convert.ToBase64String(hash).TrimEnd('=').Replace('+', '-').Replace('/', '_')}\"";
     }
 
     private static PermissionTopologyCommandResult<T> FromIdentityFailure<T>(IdentityResult result) => PermissionTopologyCommandResult<T>.Failure(PermissionTopologyCommandStatus.ValidationFailed, result.Errors.Select(static error => error.Description).ToArray());

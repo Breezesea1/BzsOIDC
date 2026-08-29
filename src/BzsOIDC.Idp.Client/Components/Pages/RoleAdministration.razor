@@ -1,0 +1,123 @@
+@page "/admin/roles"
+@using BzsOIDC.Idp.Client.Services.Permissions
+@inject IPermissionTopologyClient RolesClient
+
+<PageTitle>Role administration</PageTitle>
+<AuthorizeView>
+    <Authorized>
+        <section data-testid="roles-page">
+            <h1>Role administration</h1>
+            <div class="role-toolbar">
+                <input aria-label="Search roles" @bind="_search" @bind:event="oninput" @onchange="ReloadAsync" />
+                <button type="button" @onclick="BeginCreate">New Role</button>
+            </div>
+            @if (_error is not null) { <p role="alert">@_error</p> }
+            <ul>
+                @foreach (var role in _roles)
+                {
+                    <li><button type="button" @onclick="() => SelectAsync(role)">@role.Name</button> <span>@role.PermissionCount permissions</span>@if (role.IsProtected) { <small> protected</small> } else { <button type="button" @onclick="() => DeleteAsync(role)">Delete</button> }</li>
+                }
+            </ul>
+            @if (_selected is not null)
+            {
+                <label>Role name <input @bind="_name" disabled="@_selected.IsProtected" /></label>
+                <button type="button" @onclick="SaveAsync" disabled="@(_selected.IsProtected && !_creating)">Save</button>
+                @if (!_creating)
+                {
+                    <fieldset aria-label="Permission assignment">
+                        <legend>Permission assignment</legend>
+                        @foreach (var permission in _allPermissions)
+                        {
+                            <label><input type="checkbox" checked="@_selectedPermissions.Contains(permission)" @onchange="eventArgs => TogglePermission(permission, eventArgs)" disabled="@_selected.IsProtected" /> @permission</label>
+                        }
+                        <button type="button" @onclick="SyncPermissionsAsync" disabled="@_selected.IsProtected">Save permissions</button>
+                    </fieldset>
+                }
+                @if (_conflict) { <p role="alert">This role changed elsewhere. Reload to continue; your edits are preserved.</p> }
+            }
+        </section>
+    </Authorized>
+    <NotAuthorized><p>Sign in to continue.</p></NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private IReadOnlyList<RoleResponse> _roles = [];
+    private RoleResponse? _selected;
+    private string _search = string.Empty;
+    private string _name = string.Empty;
+    private string? _error;
+    private bool _conflict;
+    private bool _creating;
+    private IReadOnlyList<string> _allPermissions = [];
+    private HashSet<string> _selectedPermissions = new(StringComparer.OrdinalIgnoreCase);
+
+    protected override Task OnInitializedAsync() => ReloadAsync();
+    private async Task ReloadAsync()
+    {
+        try { var result = await RolesClient.ListRolesAsync(_search); _roles = result?.Items ?? []; _error = null; }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+    private async Task SelectAsync(RoleResponse role)
+    {
+        _selected = await RolesClient.GetRoleAsync(role.Id) ?? role;
+        _name = _selected.Name;
+        _creating = false;
+        _conflict = false;
+        _selectedPermissions = new HashSet<string>(await RolesClient.GetRolePermissionsAsync(_selected.Id) ?? [], StringComparer.OrdinalIgnoreCase);
+        var resources = await RolesClient.GetResourcesAsync() ?? [];
+        _allPermissions = resources.SelectMany(resource => resource.Permissions).Select(permission => permission.Name).Distinct(StringComparer.OrdinalIgnoreCase).Order().ToArray();
+    }
+
+    private void BeginCreate()
+    {
+        _selected = new RoleResponse(Guid.Empty, string.Empty, string.Empty, false, 0, [], string.Empty);
+        _name = string.Empty;
+        _creating = true;
+        _selectedPermissions.Clear();
+        _conflict = false;
+        _error = null;
+    }
+    private async Task SaveAsync()
+    {
+        if (_selected is null || string.IsNullOrWhiteSpace(_name)) { _error = "Role name is required."; return; }
+        if (_creating)
+        {
+            using var createResponse = await RolesClient.CreateRoleAsync(new RoleUpsertRequest(_name.Trim()));
+            if (!createResponse.IsSuccessStatusCode) { _error = $"Request failed ({(int)createResponse.StatusCode})."; return; }
+            _selected = null;
+            _creating = false;
+            await ReloadAsync();
+            return;
+        }
+        using var response = await RolesClient.UpdateRoleAsync(_selected.Id, new RoleUpsertRequest(_name), _selected.ETag);
+        if (response.StatusCode == System.Net.HttpStatusCode.PreconditionFailed) { _conflict = true; return; }
+        if (!response.IsSuccessStatusCode) { _error = $"Request failed ({(int)response.StatusCode})."; return; }
+        _conflict = false; await ReloadAsync(); await SelectAsync(_selected);
+    }
+
+    private async Task DeleteAsync(RoleResponse role)
+    {
+        if (role.IsProtected) { _error = "Protected Roles cannot be deleted."; return; }
+        using var response = await RolesClient.DeleteRoleAsync(role.Id, role.ETag);
+        if (response.StatusCode == System.Net.HttpStatusCode.PreconditionFailed) { _error = "This Role changed elsewhere. Reload and try again."; return; }
+        if (!response.IsSuccessStatusCode) { _error = $"Request failed ({(int)response.StatusCode})."; return; }
+        if (_selected?.Id == role.Id) _selected = null;
+        await ReloadAsync();
+    }
+
+    private void TogglePermission(string permission, ChangeEventArgs args)
+    {
+        if (args.Value is bool selected && selected) _selectedPermissions.Add(permission);
+        else _selectedPermissions.Remove(permission);
+    }
+
+    private async Task SyncPermissionsAsync()
+    {
+        if (_selected is null || _creating) return;
+        using var response = await RolesClient.SyncRolePermissionsAsync(_selected.Id, new RolePermissionSyncRequest(_selectedPermissions.Order(StringComparer.OrdinalIgnoreCase).ToArray()), _selected.ETag);
+        if (response.StatusCode == System.Net.HttpStatusCode.PreconditionFailed) { _conflict = true; return; }
+        if (!response.IsSuccessStatusCode) { _error = $"Request failed ({(int)response.StatusCode})."; return; }
+        _conflict = false;
+        await SelectAsync(_selected);
+    }
+}

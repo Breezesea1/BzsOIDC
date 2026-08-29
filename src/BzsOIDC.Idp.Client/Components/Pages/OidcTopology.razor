@@ -1,0 +1,37 @@
+@page "/admin/oidc-topology"
+@using BzsOIDC.Contracts
+@using BzsOIDC.Idp.Client.Services.Oidc
+@inject IOidcTopologyClient Topology
+
+<AuthorizeView>
+    <Authorized>
+        <section data-testid="oidc-topology-page">
+            <h1>OIDC administration topology</h1>
+            <button type="button" @onclick="RefreshAsync">Refresh</button>
+            @if (_error is not null) { <p role="alert">@_error</p> }
+            @if (_snapshot is null && _error is null) { <p aria-live="polite">Loading…</p> }
+            @if (_snapshot is not null)
+            {
+                <p>Observed @(_snapshot.ObservedAt.ToLocalTime()) (best-effort, non-atomic)</p>
+                <h2>OIDC clients</h2>
+                <ul>@foreach (var client in _snapshot.Clients) { <li>@client.DisplayName (@client.ClientId) — @string.Join(", ", client.Scopes)</li> }</ul>
+                <h2>Release scopes</h2>
+                <ul>@foreach (var scope in _snapshot.Scopes) { <li>@scope.Name — @string.Join(", ", scope.Permissions)</li> }</ul>
+            }
+        </section>
+    </Authorized>
+    <NotAuthorized><p>Sign in to continue.</p></NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private OidcTopologyResponse? _snapshot;
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => RefreshAsync();
+
+    private async Task RefreshAsync()
+    {
+        try { _snapshot = await Topology.GetAsync(); _error = null; }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+}

@@ -1,0 +1,75 @@
+@page "/admin/users"
+@using BzsOIDC.Contracts
+@using BzsOIDC.Idp.Client.Services.Users
+@inject IUsersClient UsersClient
+
+<PageTitle>Users</PageTitle>
+<section class="admin-users" data-testid="users-page">
+    <header><h1>User administration</h1><button type="button" @onclick="BeginCreate">New user</button></header>
+    <div class="user-toolbar"><input aria-label="Search users" @bind="_search" @bind:event="oninput" @onchange="ReloadAsync" placeholder="Search" /></div>
+    @if (_error is not null) { <p role="alert">@_error</p> }
+    <table data-testid="users-table"><thead><tr><th>User name</th><th>Email</th><th>Admin</th><th></th></tr></thead><tbody>
+    @foreach (var user in _items)
+    {
+        <tr><td>@user.UserName</td><td>@user.Email</td><td>@(user.IsAdmin ? "Yes" : "No")</td><td><button type="button" @onclick="() => BeginEdit(user)">Edit</button><button type="button" @onclick="() => DeleteAsync(user)">Delete</button></td></tr>
+    }
+    </tbody></table>
+    @if (_editing)
+    {
+        <form @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <label>User name <input @bind="_model.UserName" required /></label>
+            <label>Email <input type="email" @bind="_model.Email" /></label>
+            <label>Password <input type="password" @bind="_model.Password" /></label>
+            <label><input type="checkbox" @bind="_model.IsAdmin" /> Administrator</label>
+            <button type="submit">Save</button><button type="button" @onclick="CancelEdit">Cancel</button>
+        </form>
+    }
+</section>
+
+@code {
+    private IReadOnlyList<UserResponse> _items = [];
+    private string _search = string.Empty;
+    private bool _editing;
+    private Guid? _editingId;
+    private string? _etag;
+    private string? _error;
+    private UserEditModel _model = new();
+
+    protected override Task OnInitializedAsync() => ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        try
+        {
+            var result = await UsersClient.ListAsync(_search);
+            _items = result?.Items ?? [];
+            _error = null;
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private void BeginCreate() { _editing = true; _editingId = null; _etag = null; _model = new(); }
+    private void BeginEdit(UserResponse user) { _editing = true; _editingId = user.Id; _etag = user.ETag; _model = new() { UserName = user.UserName, Email = user.Email, IsAdmin = user.IsAdmin }; }
+    private void CancelEdit() => _editing = false;
+
+    private async Task SaveAsync()
+    {
+        HttpResponseMessage response;
+        if (_editingId is null)
+            response = await UsersClient.CreateAsync(new UserCreateRequest(_model.UserName, _model.Password ?? string.Empty, _model.Email, _model.IsAdmin));
+        else
+            response = await UsersClient.UpdateAsync(_editingId.Value, new UserUpdateRequest(_model.UserName, _model.Email, _model.Password, _model.IsAdmin), _etag ?? string.Empty);
+        if (response.StatusCode == System.Net.HttpStatusCode.PreconditionFailed) { _error = "The user changed elsewhere. Reload to continue; your edits are preserved."; return; }
+        if (!response.IsSuccessStatusCode) { _error = $"Request failed ({(int)response.StatusCode})."; return; }
+        _editing = false; await ReloadAsync();
+    }
+
+    private async Task DeleteAsync(UserResponse user)
+    {
+        var response = await UsersClient.DeleteAsync(user.Id, user.ETag);
+        if (!response.IsSuccessStatusCode) { _error = $"Request failed ({(int)response.StatusCode})."; return; }
+        await ReloadAsync();
+    }
+
+    private sealed class UserEditModel { public string UserName { get; set; } = string.Empty; public string? Email { get; set; } public string? Password { get; set; } public bool IsAdmin { get; set; } }
+}

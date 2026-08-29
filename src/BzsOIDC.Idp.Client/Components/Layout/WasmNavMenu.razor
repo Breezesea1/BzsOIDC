@@ -1,0 +1,58 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@using Microsoft.Extensions.Localization
+@inject IStringLocalizer<NavMenu> L
+
+<div class="wasm-nav-menu">
+    <SidebarBrand Href="/" Mark="O" Text="OIDC" ImageSrc="/oidc-brand.jpg" />
+    @* BzsNavItem 0.6.0 does not expose route activation callbacks yet. This
+       native event boundary observes both pointer and keyboard activation while
+       retaining BzsNavMenu/BzsNavItem active-state and focus styling. *@
+    <div @onclick="CloseNavigation" @onkeydown="HandleNavigationKeyDown">
+        <BzsNavMenu AccessibleName="@L["PrimaryNavigation"]">
+            <BzsNavItem Href="/" Label="@L["Home"]" Match="NavLinkMatch.All" />
+            <AuthorizeView>
+                <NotAuthorized>
+                    <BzsNavItem Href="/login" Label="@L["Login"]" />
+                </NotAuthorized>
+                <Authorized>
+                    <BzsNavItem Href="/admin/dashboard" Label="@L["Dashboard"]" Match="NavLinkMatch.Prefix" />
+                    <BzsNavItem Href="/admin/users" Label="@L["Users"]" Match="NavLinkMatch.Prefix" />
+                    <BzsNavItem Href="/admin/roles" Label="@L["Roles"]" Match="NavLinkMatch.Prefix" />
+                    <BzsNavItem Href="/admin/clients" Label="@L["Clients"]" Match="NavLinkMatch.Prefix" />
+                    <BzsNavItem Href="/admin/scopes" Label="@L["Scopes"]" Match="NavLinkMatch.Prefix" />
+                    <BzsNavItem Href="/admin/permissions" Label="@L["Permissions"]" Match="NavLinkMatch.Prefix" />
+                    <BzsNavItem Href="/admin/oidc-topology" Label="OIDC topology" Match="NavLinkMatch.Prefix" />
+                </Authorized>
+            </AuthorizeView>
+        </BzsNavMenu>
+    </div>
+    <div class="wasm-nav-footer">
+        <AuthorizeView Context="auth">
+            <Authorized>
+                <SidebarUserMenu Avatar="@GetAvatar(auth.User)"
+                                 Name="@GetName(auth.User)"
+                                 SecondaryText="@GetSecondary(auth.User)" />
+                <a class="wasm-nav-logout" href="/logout" data-enhance-nav="false">@L["LogOut"]</a>
+            </Authorized>
+            <NotAuthorized>
+                <SidebarUserMenu Avatar="G" Name="Guest" SecondaryText="@L["SignInToContinue"]" />
+            </NotAuthorized>
+        </AuthorizeView>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnNavigate { get; set; }
+
+    private Task CloseNavigation() => OnNavigate.InvokeAsync();
+
+    private Task HandleNavigationKeyDown(KeyboardEventArgs args)
+    {
+        return args.Key is "Enter" or " " ? CloseNavigation() : Task.CompletedTask;
+    }
+
+    private static string GetAvatar(ClaimsPrincipal user) => GetName(user) is { Length: > 0 } name ? name[..1].ToUpperInvariant() : "U";
+    private static string GetName(ClaimsPrincipal user) => user.Identity?.Name ?? user.FindFirst("display_name")?.Value ?? user.FindFirst(ClaimTypes.Email)?.Value ?? "Authenticated user";
+    private static string GetSecondary(ClaimsPrincipal user) => user.FindFirst(ClaimTypes.Email)?.Value ?? "Signed in";
+}

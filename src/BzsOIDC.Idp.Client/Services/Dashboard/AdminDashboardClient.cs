@@ -68,7 +68,7 @@ internal sealed class AdminDashboardClient(HttpClient httpClient) : IAdminDashbo
     {
         try
         {
-            using var response = await httpClient.GetAsync("api/admin/dashboard/summary", cancellationToken);
+            using var response = await httpClient.GetAsync("/api/admin/dashboard/summary", cancellationToken);
             if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
                 return AdminDashboardSummaryResult.RequiresLogin();

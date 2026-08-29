@@ -18,6 +18,11 @@
   <data name="CloseNavigation" xml:space="preserve">
     <value>关闭导航</value>
   </data>
+  <data name="OpenNavigation" xml:space="preserve"><value>打开导航</value></data>
+  <data name="SkipToContent" xml:space="preserve"><value>跳转到内容</value></data>
+  <data name="AdminArea" xml:space="preserve"><value>管理区域</value></data>
+  <data name="Dashboard" xml:space="preserve"><value>仪表盘</value></data>
+  <data name="SignInToContinue" xml:space="preserve"><value>登录后继续</value></data>
   <data name="Home" xml:space="preserve">
     <value>首页</value>
   </data>

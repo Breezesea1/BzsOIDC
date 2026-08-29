@@ -1,0 +1,84 @@
+@page "/logout"
+@using System.Net.Http.Json
+@using BzsOIDC.Contracts
+@using BzsOIDC.Idp.Client.Services.Session
+@inject IApiHttpClientFactory ApiClients
+@inject IAntiforgeryTokenStore Antiforgery
+@inject SessionAuthenticationStateProvider Session
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Sign out</PageTitle>
+<main class="auth-page logout-page" data-testid="wasm-logout" aria-labelledby="logout-heading">
+    <h1 id="logout-heading">Sign out</h1>
+    <p>Are you sure you want to sign out?</p>
+    @if (_error is not null)
+    {
+        <div id="logout-error" role="alert" aria-live="assertive">Unable to sign out. Please try again.</div>
+    }
+    <button type="button" disabled="@_busy" aria-describedby="logout-status" @onclick="LogoutAsync">@(_busy ? "Signing out…" : "Sign out")</button>
+    <span id="logout-status" role="status" aria-live="polite" aria-atomic="true">@(_busy ? "Signing out…" : string.Empty)</span>
+    <a href="@BuildReturnUrl()">Cancel</a>
+</main>
+
+@code {
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+
+    private bool _busy;
+    private string? _error;
+
+    private async Task LogoutAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            using var client = ApiClients.CreateClient();
+            using var response = await client.PostAsJsonAsync("/api/account/logout", new LogoutRequest(ReturnUrl));
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = "logout_failed";
+                return;
+            }
+
+            Antiforgery.Clear();
+            Session.Invalidate();
+            try
+            {
+                var module = await JS.InvokeAsync<IJSObjectReference>("import", "./session-sync.js");
+                await module.InvokeVoidAsync("publishSession", "logout");
+                await module.DisposeAsync();
+            }
+            catch (JSException)
+            {
+                // Session invalidation and navigation remain authoritative if sync is unavailable.
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<AccountActionResponse>();
+            Navigation.NavigateTo(ToClientPath(result?.RedirectUri), forceLoad: true);
+        }
+        catch (HttpRequestException)
+        {
+            _error = "logout_failed";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private string BuildReturnUrl() => string.IsNullOrWhiteSpace(ReturnUrl) || !ReturnUrl.StartsWith('/')
+        ? "/"
+        : ToClientPath(ReturnUrl);
+
+    private static string ToClientPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || path == "/") return "/";
+        return path.StartsWith('/') ? path : $"/{path}";
+    }
+}

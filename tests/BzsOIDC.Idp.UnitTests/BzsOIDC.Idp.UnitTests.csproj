@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\..\src\BzsOIDC.Contracts\BzsOIDC.Contracts.csproj" />
     <ProjectReference Include="..\..\src\BzsOIDC.Idp.Client\BzsOIDC.Idp.Client.csproj" />
     <ProjectReference Include="..\..\src\BzsOIDC.Idp\BzsOIDC.Idp.csproj" />
   </ItemGroup>

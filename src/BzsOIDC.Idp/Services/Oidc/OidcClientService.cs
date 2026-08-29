@@ -17,6 +17,8 @@ public interface IOidcClientService
         CancellationToken cancellationToken = default);
 
     Task<bool> DeleteAsync(string clientId, CancellationToken cancellationToken = default);
+    Task<OidcClientListResponse> ListAsync(OidcClientListQuery query, CancellationToken cancellationToken = default);
+    Task<OidcClientCommandResult<OidcClientSecretResponse>> RotateSecretAsync(string clientId, CancellationToken cancellationToken = default);
 }
 
 internal sealed class OidcClientService(
@@ -57,6 +59,8 @@ internal sealed class OidcClientService(
 
         var descriptor = OidcClientDescriptorAdapter.CreateDescriptor(evaluation, clientId);
         await applicationManager.CreateAsync(descriptor, cancellationToken);
+        var createdApplication = await applicationManager.FindByClientIdAsync(clientId, cancellationToken);
+        var etag = createdApplication is null ? string.Empty : (await ToResponseAsync(createdApplication, cancellationToken)).ETag;
 
         return new OidcClientCommandResult<OidcClientRegistrationResponse>
         {
@@ -67,6 +71,7 @@ internal sealed class OidcClientService(
                 ClientSecret = descriptor.ClientSecret,
                 DisplayName = descriptor.DisplayName ?? descriptor.ClientId!,
                 AuthFlow = evaluation.AuthFlow!.Value,
+                ETag = etag,
             },
         };
     }
@@ -112,6 +117,8 @@ internal sealed class OidcClientService(
         OidcClientUpsertRequest request,
         CancellationToken cancellationToken = default)
     {
+        if (!string.IsNullOrWhiteSpace(request.ClientSecret))
+            return new OidcClientCommandResult<OidcClientResponse> { Status = OidcClientCommandStatus.ValidationFailed, Errors = ["Client secrets can only be changed through rotation."] };
         var evaluation = clientProfile.Evaluate(request);
         if (evaluation.Errors.Length > 0)
         {
@@ -132,6 +139,9 @@ internal sealed class OidcClientService(
         }
 
         var descriptor = OidcClientDescriptorAdapter.CreateDescriptor(evaluation, clientId);
+        var persisted = new OpenIddictApplicationDescriptor();
+        await applicationManager.PopulateAsync(persisted, application, cancellationToken);
+        descriptor.ClientSecret = persisted.ClientSecret;
         await applicationManager.UpdateAsync(application, descriptor, cancellationToken);
 
         return new OidcClientCommandResult<OidcClientResponse>
@@ -157,6 +167,36 @@ internal sealed class OidcClientService(
 
         await applicationManager.DeleteAsync(application, cancellationToken);
         return true;
+    }
+
+    public async Task<OidcClientListResponse> ListAsync(OidcClientListQuery query, CancellationToken cancellationToken = default)
+    {
+        var all = await GetAllAsync(cancellationToken);
+        if (!string.IsNullOrWhiteSpace(query.Search))
+            all = all.Where(x => x.ClientId.Contains(query.Search, StringComparison.OrdinalIgnoreCase) || (x.DisplayName?.Contains(query.Search, StringComparison.OrdinalIgnoreCase) ?? false)).ToArray();
+        var descending = string.Equals(query.Direction, "desc", StringComparison.OrdinalIgnoreCase);
+        all = string.Equals(query.Sort, "displayName", StringComparison.OrdinalIgnoreCase)
+            ? (descending ? all.OrderByDescending(x => x.DisplayName).ThenBy(x => x.ClientId) : all.OrderBy(x => x.DisplayName).ThenBy(x => x.ClientId)).ToArray()
+            : (descending ? all.OrderByDescending(x => x.ClientId) : all.OrderBy(x => x.ClientId)).ToArray();
+        var page = Math.Max(1, query.Page);
+        var pageSize = Math.Clamp(query.PageSize, 1, 100);
+        return new OidcClientListResponse { Items = all.Skip((page - 1) * pageSize).Take(pageSize).ToArray(), TotalCount = all.Count, Page = page, PageSize = pageSize };
+    }
+
+    public async Task<OidcClientCommandResult<OidcClientSecretResponse>> RotateSecretAsync(string clientId, CancellationToken cancellationToken = default)
+    {
+        var application = await applicationManager.FindByClientIdAsync(clientId, cancellationToken);
+        if (application is null)
+            return new() { Status = OidcClientCommandStatus.NotFound };
+        var type = await applicationManager.GetClientTypeAsync(application, cancellationToken);
+        if (!string.Equals(type, OpenIddictConstants.ClientTypes.Confidential, StringComparison.Ordinal))
+            return new() { Status = OidcClientCommandStatus.ValidationFailed, Errors = ["Public clients cannot have a client secret."] };
+        var descriptor = new OpenIddictApplicationDescriptor();
+        await applicationManager.PopulateAsync(descriptor, application, cancellationToken);
+        var secret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        descriptor.ClientSecret = secret;
+        await applicationManager.UpdateAsync(application, descriptor, cancellationToken);
+        return new() { Status = OidcClientCommandStatus.Success, Value = new OidcClientSecretResponse { ClientId = clientId, ClientSecret = secret } };
     }
 
     /// <summary>
@@ -192,6 +232,7 @@ internal sealed class OidcClientService(
             PostLogoutRedirectUris = postLogoutRedirectUris,
             Permissions = permissions,
             Requirements = requirements,
+            ETag = $"\"{Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(await applicationManager.GetIdAsync(application, cancellationToken) ?? string.Empty))).TrimEnd('=').Replace('+', '-').Replace('/', '_')}\"",
         };
     }
 

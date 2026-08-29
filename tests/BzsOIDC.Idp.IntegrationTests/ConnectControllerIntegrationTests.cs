@@ -4,8 +4,6 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using BootstrapBlazor.Components;
-using BzsOIDC.Idp.Components;
 using BzsOIDC.Idp.Controllers;
 using BzsOIDC.Idp.Models;
 using BzsOIDC.Idp.Client.Services.Dashboard;
@@ -16,6 +14,8 @@ using BzsOIDC.Idp.Services;
 using BzsOIDC.Idp.Services.Authorization;
 using BzsOIDC.Idp.Services.Identity;
 using BzsOIDC.Idp.Services.Oidc;
+using BzsOIDC.Contracts;
+using BzsOIDC.Shared.Infrastructure.Http;
 using BzsOIDC.Shared.Infrastructure.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -27,6 +27,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
 using OpenIddict.Abstractions;
 
@@ -46,6 +47,112 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
     private string? _authCookieHeader;
 
     [Fact]
+    public async Task AccountApi_ExternalProviders_ReturnsConfiguredProviders()
+    {
+        using var response = await _client.GetAsync("/api/account/external/providers");
+        response.EnsureSuccessStatusCode();
+        var providers = await response.Content.ReadFromJsonAsync<ExternalLoginProviderResponse[]>();
+        Assert.Contains(providers ?? [], provider => provider.RouteSegment == "github");
+    }
+
+    [Fact]
+    public async Task AccountApi_LoginUnknownUser_ReturnsUnifiedInvalidCredentials()
+    {
+        var antiforgery = await GetAntiforgeryTokenAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/account/login")
+        {
+            Content = JsonContent.Create(new LoginRequest("unknown-user", "wrong-password")),
+        };
+        request.Headers.TryAddWithoutValidation(antiforgery.Token.HeaderName, antiforgery.Token.Token);
+        request.Headers.TryAddWithoutValidation("Cookie", antiforgery.Cookie);
+
+        using var response = await _client.SendAsync(request);
+
+        Assert.True(response.StatusCode == HttpStatusCode.Unauthorized, await response.Content.ReadAsStringAsync());
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        var problem = await response.Content.ReadFromJsonAsync<ApiProblemDetails>();
+        Assert.Equal(ApiErrorCodes.InvalidCredentials, problem?.Code);
+    }
+
+    [Fact]
+    public async Task AccountApi_LoginWithoutAntiforgery_IsRejected()
+    {
+        using var response = await _client.PostAsJsonAsync("/api/account/login", new LoginRequest("admin", "admin123"));
+
+        Assert.True(response.StatusCode == HttpStatusCode.BadRequest, await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task AccountApi_LogoutWithAntiforgery_InvalidatesSession()
+    {
+        await SignInAsAdminAsync();
+        var antiforgery = await GetAntiforgeryTokenAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/account/logout")
+        {
+            Content = JsonContent.Create(new LogoutRequest("/")),
+        };
+        request.Headers.TryAddWithoutValidation(antiforgery.Token.HeaderName, antiforgery.Token.Token);
+        request.Headers.TryAddWithoutValidation("Cookie", $"{_authCookieHeader}; {antiforgery.Cookie}");
+
+        using var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<AccountActionResponse>();
+        Assert.Equal("/", result?.RedirectUri);
+        _client.DefaultRequestHeaders.Remove("Cookie");
+        using var session = await _client.GetAsync("/api/session");
+        var summary = await session.Content.ReadFromJsonAsync<SessionSummary>();
+        Assert.False(summary?.IsAuthenticated);
+    }
+
+    [Fact]
+    public async Task AccountApi_LogoutWithoutAntiforgery_IsRejected()
+    {
+        await SignInAsAdminAsync();
+        using var response = await _client.PostAsJsonAsync("/api/account/logout", new LogoutRequest("/"));
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    private async Task<(AntiforgeryTokenResponse Token, string Cookie)> GetAntiforgeryTokenAsync()
+    {
+        using var response = await _client.GetAsync("/api/security/antiforgery");
+        response.EnsureSuccessStatusCode();
+        var token = await response.Content.ReadFromJsonAsync<AntiforgeryTokenResponse>()
+            ?? throw new InvalidOperationException("Missing antiforgery token.");
+        var cookie = response.Headers.TryGetValues("Set-Cookie", out var values)
+            ? string.Join("; ", values.Select(static value => value.Split(';', 2)[0]))
+            : string.Empty;
+        return (token, cookie);
+    }
+
+    private async Task<HttpResponseMessage> SendApiJsonAsync(
+        HttpMethod method,
+        string url,
+        object? content = null,
+        string? ifMatch = null)
+    {
+        var antiforgery = await GetAntiforgeryTokenAsync();
+        using var request = new HttpRequestMessage(method, url)
+        {
+            Content = content is null ? null : JsonContent.Create(content),
+        };
+        request.Headers.TryAddWithoutValidation(antiforgery.Token.HeaderName, antiforgery.Token.Token);
+        var cookies = new[] { _authCookieHeader, antiforgery.Cookie }
+            .Where(static cookie => !string.IsNullOrWhiteSpace(cookie))
+            .ToArray();
+        if (cookies.Length > 0)
+        {
+            request.Headers.TryAddWithoutValidation("Cookie", string.Join("; ", cookies));
+        }
+        if (!string.IsNullOrWhiteSpace(ifMatch))
+        {
+            request.Headers.TryAddWithoutValidation("If-Match", ifMatch);
+        }
+        return await _client.SendAsync(request);
+    }
+
+
+    [Fact]
     public async Task Authorize_WhenUnauthenticated_RedirectsToLogin()
     {
         using var request = new HttpRequestMessage(
@@ -61,19 +168,6 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
         Assert.False(string.IsNullOrWhiteSpace(location));
         Assert.Contains("/login", location, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("ReturnUrl=", location, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task LoginPage_WhenRequestedDirectly_ReturnsServerOwnedLoginForm()
-    {
-        using var response = await _client.GetAsync("/login");
-
-        response.EnsureSuccessStatusCode();
-
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("<form method=\"post\" action=\"/account/login\"", body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("/account/external-login/github", body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("BzsOIDC", body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -104,36 +198,6 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
         var query = QueryHelpers.ParseQuery(response.Headers.Location.Query);
         Assert.True(query.TryGetValue("redirect_uri", out var redirectUris));
         Assert.Equal("https://auth.breezesea.fun/signin-github", redirectUris.ToString());
-    }
-
-    [Fact]
-    public async Task AccessDeniedPage_WhenRequestedDirectly_ReturnsServerOwnedDeniedPage()
-    {
-        using var response = await _client.GetAsync("/account/denied");
-
-        response.EnsureSuccessStatusCode();
-
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("class=\"denied-page\"", body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("class=\"denied-secondary\"", body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("href=\"/login\"", body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("BzsOIDC", body, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task LogoutPage_WhenRequestedDirectly_ReturnsServerOwnedLogoutForm()
-    {
-        using var response = await _client.GetAsync("/logout?returnUrl=%2F");
-
-        response.EnsureSuccessStatusCode();
-
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("<form", body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("method=\"post\"", body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("action=\"/account/logout?returnUrl=%2F\"", body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("class=\"logout-form\"", body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("class=\"logout-secondary\"", body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("href=\"/\"", body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -532,24 +596,24 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
         await SignInAsAdminAsync();
 
         var createRequest = new RoleUpsertRequest { Name = "operators" };
-        using var createResponse = await _client.PostAsJsonAsync("/api/roles", createRequest);
+        using var createResponse = await SendApiJsonAsync(HttpMethod.Post, "/api/roles", createRequest);
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
         var created = await createResponse.Content.ReadFromJsonAsync<RoleResponse>();
         Assert.NotNull(created);
         Assert.Equal("operators", created.Name);
 
-        using var updateResponse = await _client.PutAsJsonAsync($"/api/roles/{created.Id}", new RoleUpsertRequest { Name = "support" });
+        using var updateResponse = await SendApiJsonAsync(HttpMethod.Put, $"/api/roles/{created.Id}", new RoleUpsertRequest { Name = "support" }, created.ETag);
         updateResponse.EnsureSuccessStatusCode();
 
         var updated = await updateResponse.Content.ReadFromJsonAsync<RoleResponse>();
         Assert.NotNull(updated);
         Assert.Equal("support", updated.Name);
 
-        using var syncResponse = await _client.PutAsJsonAsync($"/api/roles/{created.Id}/permissions", new RolePermissionSyncRequest
+        using var syncResponse = await SendApiJsonAsync(HttpMethod.Put, $"/api/roles/{created.Id}/permissions", new RolePermissionSyncRequest
         {
             Permissions = [PermissionConstants.UsersReadAll],
-        });
+        }, updated.ETag);
         Assert.Equal(HttpStatusCode.NoContent, syncResponse.StatusCode);
 
         using var permissionsResponse = await _client.GetAsync($"/api/roles/{created.Id}/permissions");
@@ -564,7 +628,11 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
         Assert.NotNull(shimPermissions);
         Assert.Contains(PermissionConstants.UsersReadAll, shimPermissions);
 
-        using var deleteResponse = await _client.DeleteAsync($"/api/roles/{created.Id}");
+        using var roleReadResponse = await _client.GetAsync($"/api/roles/{created.Id}");
+        roleReadResponse.EnsureSuccessStatusCode();
+        var currentRole = await roleReadResponse.Content.ReadFromJsonAsync<RoleResponse>();
+        Assert.NotNull(currentRole);
+        using var deleteResponse = await SendApiJsonAsync(HttpMethod.Delete, $"/api/roles/{created.Id}", null, currentRole.ETag);
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
     }
 
@@ -573,15 +641,15 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
     {
         await SignInAsAdminAsync();
 
-        using var createResponse = await _client.PostAsJsonAsync("/api/roles", new RoleUpsertRequest { Name = "auditors" });
+        using var createResponse = await SendApiJsonAsync(HttpMethod.Post, "/api/roles", new RoleUpsertRequest { Name = "auditors" });
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
         var created = await createResponse.Content.ReadFromJsonAsync<RoleResponse>();
         Assert.NotNull(created);
 
-        using var invalidResponse = await _client.PutAsJsonAsync($"/api/roles/{created.Id}/permissions", new RolePermissionSyncRequest
+        using var invalidResponse = await SendApiJsonAsync(HttpMethod.Put, $"/api/roles/{created.Id}/permissions", new RolePermissionSyncRequest
         {
             Permissions = [PermissionConstants.UsersReadAll, "missing.permission"],
-        });
+        }, created.ETag);
         Assert.Equal(HttpStatusCode.BadRequest, invalidResponse.StatusCode);
 
         using var permissionsResponse = await _client.GetAsync($"/api/roles/{created.Id}/permissions");
@@ -708,7 +776,7 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
             PostLogoutRedirectUris = ["https://localhost/interactive/logout-callback"],
         };
 
-        using var createResponse = await _client.PostAsJsonAsync("/api/oidc/clients", request);
+        using var createResponse = await SendApiJsonAsync(HttpMethod.Post, "/api/oidc/clients", request);
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
         var created = await createResponse.Content.ReadFromJsonAsync<OidcClientRegistrationResponse>();
@@ -749,7 +817,7 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
             RedirectUris = ["https://localhost/explicit-managed/callback"],
         };
 
-        using var createResponse = await _client.PostAsJsonAsync("/api/oidc/clients", request);
+        using var createResponse = await SendApiJsonAsync(HttpMethod.Post, "/api/oidc/clients", request);
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
         using var getResponse = await _client.GetAsync("/api/oidc/clients/explicit-managed-client");
@@ -896,7 +964,7 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
             Scopes = [PermissionConstants.ScopeApi],
         };
 
-        using var createResponse = await _client.PostAsJsonAsync("/api/oidc/clients", request);
+        using var createResponse = await SendApiJsonAsync(HttpMethod.Post, "/api/oidc/clients", request);
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
         var created = await createResponse.Content.ReadFromJsonAsync<OidcClientRegistrationResponse>();
@@ -914,7 +982,7 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
             Scopes = [PermissionConstants.ScopeApi],
         };
 
-        using var secondCreateResponse = await _client.PostAsJsonAsync("/api/oidc/clients", request);
+        using var secondCreateResponse = await SendApiJsonAsync(HttpMethod.Post, "/api/oidc/clients", request);
         Assert.Equal(HttpStatusCode.Created, secondCreateResponse.StatusCode);
         var secondCreated = await secondCreateResponse.Content.ReadFromJsonAsync<OidcClientRegistrationResponse>();
         Assert.NotNull(secondCreated);
@@ -946,10 +1014,10 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
             RedirectUris = ["https://localhost/interactive/conflict-callback"],
         };
 
-        using var firstResponse = await _client.PostAsJsonAsync("/api/oidc/clients", request);
+        using var firstResponse = await SendApiJsonAsync(HttpMethod.Post, "/api/oidc/clients", request);
         Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
 
-        using var secondResponse = await _client.PostAsJsonAsync("/api/oidc/clients", request);
+        using var secondResponse = await SendApiJsonAsync(HttpMethod.Post, "/api/oidc/clients", request);
         Assert.Equal(HttpStatusCode.Conflict, secondResponse.StatusCode);
 
         var error = await secondResponse.Content.ReadAsStringAsync();
@@ -969,7 +1037,7 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
             Scopes = [OpenIddictConstants.Scopes.OpenId],
         };
 
-        using var response = await _client.PostAsJsonAsync("/api/oidc/clients", request);
+        using var response = await SendApiJsonAsync(HttpMethod.Post, "/api/oidc/clients", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var payload = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
@@ -990,7 +1058,7 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
             RedirectUris = ["https://localhost/callback"],
         };
 
-        using var response = await _client.PostAsJsonAsync("/api/oidc/clients", request);
+        using var response = await SendApiJsonAsync(HttpMethod.Post, "/api/oidc/clients", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var payload = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
@@ -1001,7 +1069,7 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ClientUpdate_WhenClientMissing_ReturnsNotFound()
+    public async Task ClientUpdate_WhenClientMissing_RequiresIfMatch()
     {
         await SignInAsAdminAsync();
 
@@ -1014,8 +1082,8 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
             RedirectUris = ["https://localhost/interactive/updated-callback"],
         };
 
-        using var response = await _client.PutAsJsonAsync("/api/oidc/clients/missing-client", request);
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        using var response = await SendApiJsonAsync(HttpMethod.Put, "/api/oidc/clients/missing-client", request);
+        Assert.Equal(HttpStatusCode.PreconditionRequired, response.StatusCode);
     }
 
     [Fact]
@@ -1034,7 +1102,7 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
             RedirectUris = ["https://localhost/interactive/update-callback"],
         };
 
-        using var createResponse = await _client.PostAsJsonAsync("/api/oidc/clients", createRequest);
+        using var createResponse = await SendApiJsonAsync(HttpMethod.Post, "/api/oidc/clients", createRequest);
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
         var updateRequest = new OidcClientUpsertRequest
@@ -1048,7 +1116,11 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
             RedirectUris = ["https://localhost/interactive/updated-callback"],
         };
 
-        using var updateResponse = await _client.PutAsJsonAsync("/api/oidc/clients/interactive-client-update", updateRequest);
+        using var clientReadResponse = await _client.GetAsync("/api/oidc/clients/interactive-client-update");
+        clientReadResponse.EnsureSuccessStatusCode();
+        var currentClient = await clientReadResponse.Content.ReadFromJsonAsync<OidcClientResponse>();
+        Assert.NotNull(currentClient);
+        using var updateResponse = await SendApiJsonAsync(HttpMethod.Put, "/api/oidc/clients/interactive-client-update", updateRequest, currentClient.ETag);
         updateResponse.EnsureSuccessStatusCode();
 
         var updated = await updateResponse.Content.ReadFromJsonAsync<OidcClientResponse>();
@@ -1065,7 +1137,7 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
     {
         await SignInAsAdminAsync();
 
-        using var response = await _client.DeleteAsync("/api/oidc/clients/missing-client");
+        using var response = await SendApiJsonAsync(HttpMethod.Delete, "/api/oidc/clients/missing-client");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -1085,10 +1157,14 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
             RedirectUris = ["https://localhost/interactive/delete-callback"],
         };
 
-        using var createResponse = await _client.PostAsJsonAsync("/api/oidc/clients", request);
+        using var createResponse = await SendApiJsonAsync(HttpMethod.Post, "/api/oidc/clients", request);
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
-        using var deleteResponse = await _client.DeleteAsync("/api/oidc/clients/interactive-client-delete");
+        using var clientReadResponse = await _client.GetAsync("/api/oidc/clients/interactive-client-delete");
+        clientReadResponse.EnsureSuccessStatusCode();
+        var currentClient = await clientReadResponse.Content.ReadFromJsonAsync<OidcClientResponse>();
+        Assert.NotNull(currentClient);
+        using var deleteResponse = await SendApiJsonAsync(HttpMethod.Delete, "/api/oidc/clients/interactive-client-delete", null, currentClient.ETag);
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
 
         using var getResponse = await _client.GetAsync("/api/oidc/clients/interactive-client-delete");
@@ -1109,6 +1185,9 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["IdpIssuer"] = BaseUri.ToString().TrimEnd('/'),
+            // Keep the legacy HTML consent assertions isolated to this fixture.
+            // Hosted WASM routing is exercised by the production configuration and E2E coverage.
+            ["Frontend:Mode"] = "Server",
             ["Identity:Admin:UserName"] = "admin",
             ["Identity:Admin:Password"] = "admin123",
             ["PermissionPolicy:PolicyPrefix"] = PermissionPolicyOptions.DefaultPolicyPrefix,
@@ -1119,13 +1198,9 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
 
         builder.Services.AddMemoryCache();
         builder.Services.AddHttpContextAccessor();
-        builder.Services.AddBootstrapBlazor();
         builder.Services.AddLocalization(options => { options.ResourcesPath = "Resources"; });
         builder.Services.AddForwardedHeaders();
         builder.Services.AddExternalAuthenticationServices(builder.Configuration);
-        builder.Services.AddRazorComponents()
-            .AddInteractiveServerComponents()
-            .AddInteractiveWebAssemblyComponents();
         builder.Services.AddDbContext<IdpDbContext>(
             options => ConfigureTestDatabase(options, _connection),
             contextLifetime: ServiceLifetime.Scoped,
@@ -1151,20 +1226,42 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
         builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
 
         builder.Services
-            .AddControllers()
+            .AddControllersWithViews()
             .AddApplicationPart(typeof(ConnectController).Assembly);
 
         _app = builder.Build();
-        _app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+        _app.UseWhen(
+            context => ApiProblemDetailsWriter.IsApiRequest(context.Request),
+            apiBranch => apiBranch.UseStatusCodePages(async statusContext =>
+            {
+                var context = statusContext.HttpContext;
+                if (context.Response.StatusCode >= StatusCodes.Status400BadRequest && !context.Response.HasStarted)
+                {
+                    await ApiProblemDetailsWriter.WriteAsync(
+                        context,
+                        context.Response.StatusCode,
+                        ApiProblemDetailsWriter.CodeForStatus(context.Response.StatusCode));
+                }
+            }));
         _app.UseForwardedHeaders();
         _app.UseAuthentication();
         _app.UseAuthorization();
+        _app.Use(async (context, next) =>
+        {
+            try
+            {
+                await next();
+            }
+            catch (Microsoft.AspNetCore.Antiforgery.AntiforgeryValidationException)
+            {
+                await ApiProblemDetailsWriter.WriteAsync(
+                    context,
+                    StatusCodes.Status400BadRequest,
+                    ApiErrorCodes.AntiforgeryFailed);
+            }
+        });
         _app.UseAntiforgery();
         _app.MapControllers();
-        _app.MapRazorComponents<global::BzsOIDC.Idp.Components.App>()
-            .AddInteractiveServerRenderMode()
-            .AddInteractiveWebAssemblyRenderMode()
-            .AddAdditionalAssemblies(typeof(IAdminDashboardClient).Assembly);
 
         await _app.StartAsync();
 

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Bunit;
 using BzsOIDC.Idp.Client.Components.Layout;
 using BzsOIDC.Idp.UnitTests.TestDoubles;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
@@ -77,6 +78,28 @@ public sealed class NavMenuTests
 
         Assert.Contains("class=\"sidebar-user-menu\"", cut.Markup, StringComparison.Ordinal);
         Assert.Contains("class=\"sidebar-user-menu__trigger sidebar-surface\"", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WasmNavMenu_WhenRouteLinkActivated_RequestsNavigationClose()
+    {
+        using var context = CreateContext();
+        SetAuthenticationState(
+            context,
+            new ClaimsPrincipal(new ClaimsIdentity(
+            [
+                new Claim(ClaimTypes.Name, "admin"),
+                new Claim(ClaimTypes.Role, "admin"),
+            ], "TestAuth")));
+
+        var closeRequests = 0;
+        var cut = context.Render<CascadingAuthenticationState>(parameters => parameters
+            .AddChildContent<WasmNavMenu>(child => child
+                .Add(x => x.OnNavigate, EventCallback.Factory.Create(this, () => closeRequests++))));
+
+        cut.Find("a[href='/admin/dashboard']").Click();
+
+        Assert.Equal(1, closeRequests);
     }
 
     private static BunitContext CreateContext()

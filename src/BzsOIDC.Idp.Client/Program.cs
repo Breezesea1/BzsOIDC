@@ -1,6 +1,12 @@
 using System.Globalization;
 using ApexCharts;
+using Bzs.Blazor;
 using BzsOIDC.Idp.Client.Services.Dashboard;
+using BzsOIDC.Idp.Client.Services.Session;
+using BzsOIDC.Idp.Client.Services.Users;
+using BzsOIDC.Idp.Client.Services.Scopes;
+using BzsOIDC.Idp.Client.Services.Permissions;
+using BzsOIDC.Idp.Client.Services.Oidc;
 using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.JSInterop;
@@ -12,8 +18,15 @@ builder.Services.AddLocalization(options =>
     options.ResourcesPath = "Resources";
 });
 builder.Services.AddAuthorizationCore();
+builder.Services.AddBzsBlazor();
 builder.Services.AddAuthenticationStateDeserialization();
 builder.Services.AddAdminDashboardClient(_ => new Uri(builder.HostEnvironment.BaseAddress));
+builder.Services.AddClientSessionLifecycle(_ => new Uri(builder.HostEnvironment.BaseAddress));
+builder.Services.AddUsersClient();
+builder.Services.AddScopesClient();
+builder.Services.AddOidcClientsClient();
+builder.Services.AddPermissionTopologyClient();
+builder.Services.AddOidcTopologyClient();
 builder.Services.AddApexCharts();
 
 var host = builder.Build();

@@ -23,17 +23,17 @@ public sealed class OidcFlowE2ETests(AppHostFixture fixture) : E2EPageTest
 
         await AppUi.LoginAsAdminAsync(this, fixture, "/admin/clients");
         await Page.GotoAsync(fixture.BuildUrl("/admin/clients"));
+        await AppUi.WaitForAppReadyAsync(this);
 
-        await Page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex("新建客户端|Register client|Create", RegexOptions.IgnoreCase) }).ClickAsync();
-        await Page.Locator("#editor-client-id").FillAsync(clientId);
-        await Page.Locator("#editor-display-name").FillAsync("OIDC E2E Client");
-        await Page.Locator("#editor-auth-flow").ClickAsync();
-        await Page.Locator("#editor-auth-flow-option-0").ClickAsync();
-        await Page.Locator("#editor-scopes").FillAsync("openid\nprofile\nemail\nroles\noffline_access\napi");
-        await Page.Locator("#editor-redirect-uris").FillAsync(redirectUri);
-        await Page.Locator("#editor-post-logout-uris").FillAsync(redirectUri);
-        await Page.Locator(".admin-dialog-shell .admin-primary-button").ClickAsync();
-        await Expect(Page.Locator(".admin-feedback.is-success")).ToBeVisibleAsync(new() { Timeout = 20000 });
+        await Page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex("新建客户端|New OIDC client|Create", RegexOptions.IgnoreCase) }).ClickAsync();
+        await Page.GetByLabel("Client ID").FillAsync(clientId);
+        await Page.GetByLabel("Display name").FillAsync("OIDC E2E Client");
+        await Page.GetByLabel("Client type").SelectOptionAsync("true");
+        await Page.GetByLabel("Authentication flow").SelectOptionAsync("AuthorizationCode");
+        await Page.GetByLabel("Scopes").FillAsync("openid, profile, email, roles, offline_access, api");
+        await Page.GetByLabel("Redirect URIs").FillAsync(redirectUri);
+        await Page.GetByLabel("Post-logout redirect URIs").FillAsync(redirectUri);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Create" }).ClickAsync();
 
         var authorizeUrl = QueryHelpers.AddQueryString(
             fixture.BuildUrl("/connect/authorize"),
@@ -48,6 +48,12 @@ public sealed class OidcFlowE2ETests(AppHostFixture fixture) : E2EPageTest
             });
 
         await Page.GotoAsync(authorizeUrl);
+        if (Page.Url.Contains("/consent", StringComparison.OrdinalIgnoreCase))
+        {
+            await AppUi.WaitForAppReadyAsync(this);
+            await Expect(Page.GetByRole(AriaRole.Heading, new() { NameRegex = new Regex("Allow .* access", RegexOptions.IgnoreCase) })).ToBeVisibleAsync(new() { Timeout = 30000 });
+            await Page.GetByRole(AriaRole.Button, new() { Name = "Allow access" }).ClickAsync();
+        }
         await Expect(Page).ToHaveURLAsync(
             new Regex($"{Regex.Escape(redirectUri)}.*code=", RegexOptions.IgnoreCase),
             new() { Timeout = 30000 });

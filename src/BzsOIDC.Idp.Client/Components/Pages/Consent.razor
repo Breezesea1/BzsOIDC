@@ -1,0 +1,75 @@
+@page "/consent"
+@using System.Net.Http.Json
+@using BzsOIDC.Contracts
+@using BzsOIDC.Idp.Client.Services.Session
+@inject IApiHttpClientFactory ApiClients
+@inject IAntiforgeryTokenStore Antiforgery
+@inject NavigationManager Navigation
+
+<PageTitle>Authorize application</PageTitle>
+<main class="auth-page consent-page" aria-labelledby="consent-heading">
+    @if (_loading)
+    {
+        <p role="status" aria-live="polite" aria-atomic="true">Loading authorization request…</p>
+    }
+    else if (_error is not null)
+    {
+        <div role="alert" aria-live="assertive">@_error</div>
+    }
+    else if (_preview is not null)
+    {
+        <h1 id="consent-heading">Allow @_preview.DisplayName to access your account?</h1>
+        <p>The application is requesting the following scopes.</p>
+        <ul>
+            @foreach (var scope in _preview.Scopes)
+            {
+                <li><strong>@(scope.DisplayName ?? scope.Name)</strong>@(string.IsNullOrWhiteSpace(scope.Description) ? null : $" — {scope.Description}")</li>
+            }
+        </ul>
+        <form method="post" action="@_preview.AuthorizeUrl">
+            <input type="hidden" name="@_antiforgery.FormFieldName" value="@_antiforgery.Token" />
+            <input type="hidden" name="consent_request" value="@_preview.RequestToken" />
+            <button type="submit" name="consent" value="accept">Allow access</button>
+            <button type="submit" name="consent" value="deny">Deny</button>
+        </form>
+    }
+</main>
+
+@code {
+    [SupplyParameterFromQuery(Name = "request")] public string? RequestToken { get; set; }
+
+    private OidcConsentPreviewResponse? _preview;
+    private AntiforgeryTokenResponse _antiforgery = new();
+    private string? _error;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrWhiteSpace(RequestToken))
+        {
+            _error = "The authorization request is invalid.";
+            _loading = false;
+            return;
+        }
+
+        try
+        {
+            using var client = ApiClients.CreateClient();
+            _preview = await client.GetFromJsonAsync<OidcConsentPreviewResponse>(
+                $"/api/oidc/consent-preview?request={Uri.EscapeDataString(RequestToken)}");
+            _antiforgery = await Antiforgery.GetOrRefreshAsync();
+            if (_preview is null)
+            {
+                _error = "The authorization request is invalid.";
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _error = "The authorization request is invalid.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

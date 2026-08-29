@@ -1,0 +1,50 @@
+@inherits LayoutComponentBase
+@using System.Globalization
+@using Microsoft.Extensions.Localization
+@inject IStringLocalizer<NavMenu> L
+
+<div class="wasm-layout-shell">
+    <a class="wasm-skip-link" href="#wasm-main-content">@L["SkipToContent"]</a>
+    <BzsNavigationDrawer Open="_navigationOpen"
+                         OpenChanged="OnNavigationOpenChanged"
+                         Variant="BzsNavigationDrawerVariant.Responsive"
+                         Position="BzsNavigationDrawerPosition.Start"
+                         CloseOnBackdropClick="true"
+                         CloseOnEscape="true"
+                         InitialFocusSelector="a"
+                         AccessibleName="@L["PrimaryNavigation"]">
+        <WasmNavMenu OnNavigate="CloseNavigation" />
+    </BzsNavigationDrawer>
+
+    <main class="wasm-layout-main">
+        <header class="wasm-layout-topbar">
+            <BzsButton Variant="BzsButtonVariant.Ghost"
+                       Size="BzsButtonSize.Small"
+                       AccessibleName="@L["OpenNavigation"]"
+                       AriaExpanded="@_navigationOpen"
+                       Click="OpenNavigation">☰</BzsButton>
+            <span class="wasm-layout-title">@L["AdminArea"]</span>
+            <Preferences CurrentCulture="@CultureInfo.CurrentUICulture.Name" CurrentTheme="system" />
+        </header>
+        <article id="wasm-main-content" class="wasm-layout-content" tabindex="-1">@Body</article>
+    </main>
+</div>
+
+@code {
+    private bool _navigationOpen = true;
+
+    private Task OpenNavigation() {
+        _navigationOpen = true;
+        return Task.CompletedTask;
+    }
+
+    private Task CloseNavigation() {
+        _navigationOpen = false;
+        return Task.CompletedTask;
+    }
+
+    private Task OnNavigationOpenChanged(bool open) {
+        _navigationOpen = open;
+        return Task.CompletedTask;
+    }
+}

@@ -1,0 +1,59 @@
+@implements IAsyncDisposable
+@using BzsOIDC.Idp.Client.Services.Session
+@inject IJSRuntime JS
+@inject SessionAuthenticationStateProvider Session
+@inject NavigationManager Navigation
+
+@code {
+    private IJSObjectReference? _module;
+    private IJSObjectReference? _subscription;
+    private DotNetObjectReference<SessionSyncHost>? _reference;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        _reference = DotNetObjectReference.Create(this);
+        _module = await JS.InvokeAsync<IJSObjectReference>("import", "./session-sync.js");
+        _subscription = await _module.InvokeAsync<IJSObjectReference>("subscribeSession", _reference);
+    }
+
+    [JSInvokable]
+    public async Task OnSessionChanged(string value)
+    {
+        if (string.Equals(value, "logout", StringComparison.OrdinalIgnoreCase))
+        {
+            Session.Invalidate();
+        }
+        else if (string.Equals(value, "expired", StringComparison.OrdinalIgnoreCase))
+        {
+            Session.Invalidate();
+            var current = new Uri(Navigation.Uri, UriKind.Absolute);
+            if (current.AbsolutePath.EndsWith("/login", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+            var returnUrl = string.IsNullOrWhiteSpace(current.PathAndQuery) ? "/" : $"{current.PathAndQuery}{current.Fragment}";
+            var basePath = new Uri(Navigation.BaseUri, UriKind.Absolute).AbsolutePath.TrimEnd('/');
+            var login = string.IsNullOrEmpty(basePath) ? "/login" : $"{basePath}/login";
+            Navigation.NavigateTo($"{login}?returnUrl={Uri.EscapeDataString(returnUrl)}", forceLoad: true);
+        }
+        else if (string.Equals(value, "login", StringComparison.OrdinalIgnoreCase))
+        {
+            await Session.RefreshAsync();
+        }
+    }
+
+    [JSInvokable]
+    public Task OnVisibilityChanged() => Session.RefreshAsync();
+
+    public async ValueTask DisposeAsync()
+    {
+        _reference?.Dispose();
+        if (_subscription is not null) await _subscription.DisposeAsync();
+        if (_module is not null) await _module.DisposeAsync();
+    }
+}

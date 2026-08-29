@@ -18,6 +18,11 @@
   <data name="CloseNavigation" xml:space="preserve">
     <value>Close navigation</value>
   </data>
+  <data name="OpenNavigation" xml:space="preserve"><value>Open navigation</value></data>
+  <data name="SkipToContent" xml:space="preserve"><value>Skip to content</value></data>
+  <data name="AdminArea" xml:space="preserve"><value>Administration</value></data>
+  <data name="Dashboard" xml:space="preserve"><value>Dashboard</value></data>
+  <data name="SignInToContinue" xml:space="preserve"><value>Sign in to continue</value></data>
   <data name="Home" xml:space="preserve">
     <value>Home</value>
   </data>

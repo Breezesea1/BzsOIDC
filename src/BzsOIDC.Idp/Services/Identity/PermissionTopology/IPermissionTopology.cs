@@ -34,6 +34,8 @@ public interface IPermissionTopology
 
     Task<IReadOnlyList<RoleResponse>> GetAllRolesAsync(CancellationToken cancellationToken = default);
 
+    Task<RoleListResponse> ListRolesAsync(RoleListQuery query, CancellationToken cancellationToken = default);
+
     Task<RoleResponse?> GetRoleByIdAsync(Guid roleId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<string>?> GetRolePermissionsAsync(Guid roleId, CancellationToken cancellationToken = default);

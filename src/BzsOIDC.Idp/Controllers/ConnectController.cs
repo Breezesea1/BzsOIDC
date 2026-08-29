@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Primitives;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using SharedPermissionConstants = BzsOIDC.Shared.Infrastructure.Authorization.PermissionConstants;
@@ -22,7 +24,9 @@ public sealed class ConnectController(
     IOidcConsentPageRenderer consentPageRenderer,
     IPermissionTopology permissionTopology,
     IOidcPrincipalFactory oidcPrincipalFactory,
-    IOidcConsentLifecycle consentLifecycle) : ControllerBase
+    IOidcConsentLifecycle consentLifecycle,
+    IConfiguration configuration,
+    IOidcConsentRequestProtector requestProtector) : ControllerBase
 {
     /// <summary>
     /// 处理授权流程。
@@ -87,6 +91,20 @@ public sealed class ConnectController(
             return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
 
+        if (HttpMethods.IsPost(Request.Method))
+        {
+            var consentToken = Request.Form["consent_request"].FirstOrDefault()
+                ?? Request.Query["consent_request"].FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(consentToken) && !ValidateConsentRequestToken(consentToken))
+            {
+                return BadRequest(new
+                {
+                    error = OpenIddictConstants.Errors.InvalidRequest,
+                    error_description = "The authorization request could not be validated.",
+                });
+            }
+        }
+
         if (consentResult.Outcome == OidcConsentOutcome.ConsentRequired)
         {
             return Forbid(
@@ -96,6 +114,12 @@ public sealed class ConnectController(
                     [".error_description"] = "The authorization request requires the user to consent.",
                 }),
                 OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        }
+
+        if (!HttpMethods.IsPost(Request.Method) && IsWasmFrontendEnabled())
+        {
+            var token = requestProtector.Protect(Request.QueryString.Value ?? string.Empty);
+            return Redirect(QueryHelpers.AddQueryString("/consent", "request", token));
         }
 
         if (HttpMethods.IsPost(Request.Method))
@@ -311,6 +335,7 @@ public sealed class ConnectController(
         {
             principal.SetAuthorizationId(authorizationId);
         }
+
     }
 
     private async Task<string> ResolveClientDisplayNameAsync(OpenIddictRequest request, CancellationToken cancellationToken)
@@ -329,5 +354,35 @@ public sealed class ConnectController(
         }
 
         return request.ClientId ?? "the client";
+    }
+
+    private bool IsWasmFrontendEnabled() =>
+        string.Equals(configuration["Frontend:Mode"], "Wasm", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(configuration["Frontend:Mode"], "WebAssembly", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(configuration["Frontend:Mode"], "HostedWasm", StringComparison.OrdinalIgnoreCase);
+
+    private bool ValidateConsentRequestToken(string token)
+    {
+        if (!requestProtector.TryUnprotect(token, out var originalQuery))
+        {
+            return false;
+        }
+
+        var original = QueryHelpers.ParseQuery(originalQuery);
+        var current = Request.Query;
+        var form = Request.HasFormContentType ? Request.Form : null;
+        foreach (var key in new[] { "client_id", "response_type", "redirect_uri", "scope", "state", "nonce", "code_challenge", "code_challenge_method", "prompt" })
+        {
+            var expected = original.TryGetValue(key, out var expectedValues) ? expectedValues : StringValues.Empty;
+            var actual = form is not null && form.TryGetValue(key, out var formValues)
+                ? formValues
+                : current.TryGetValue(key, out var actualValues) ? actualValues : StringValues.Empty;
+            if (!expected.ToArray().SequenceEqual(actual.ToArray(), StringComparer.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

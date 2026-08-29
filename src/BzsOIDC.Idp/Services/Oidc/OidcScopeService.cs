@@ -1,4 +1,7 @@
 using OpenIddict.Abstractions;
+using System.Security.Cryptography;
+using System.Text;
+using BzsOIDC.Idp.Services.Identity;
 
 namespace BzsOIDC.Idp.Services.Oidc;
 
@@ -9,6 +12,7 @@ public interface IOidcScopeService
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<OidcScopeResponse>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<OidcScopeListResponse> ListAsync(OidcScopeListQuery query, CancellationToken cancellationToken = default);
     Task<OidcScopeResponse?> GetByNameAsync(string name, CancellationToken cancellationToken = default);
 
     Task<OidcScopeCommandResult<OidcScopeResponse>> UpdateAsync(
@@ -20,7 +24,7 @@ public interface IOidcScopeService
     Task InitializeDefaultsIfMissingAsync(IEnumerable<string> scopeNames, CancellationToken cancellationToken = default);
 }
 
-internal sealed class OidcScopeService(IOpenIddictScopeManager scopeManager) : IOidcScopeService
+internal sealed class OidcScopeService(IOpenIddictScopeManager scopeManager, IOidcClientService clientService, IPermissionTopology permissionTopology) : IOidcScopeService
 {
     private static readonly string[] ReservedScopeNames =
     [
@@ -75,6 +79,36 @@ internal sealed class OidcScopeService(IOpenIddictScopeManager scopeManager) : I
         }
 
         return list.OrderBy(static item => item.Name, StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    public async Task<OidcScopeListResponse> ListAsync(OidcScopeListQuery query, CancellationToken cancellationToken = default)
+    {
+        var page = Math.Max(1, query.Page);
+        var pageSize = Math.Clamp(query.PageSize <= 0 ? 25 : query.PageSize, 1, 100);
+        var all = (await GetAllAsync(cancellationToken)).AsEnumerable();
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var search = query.Search.Trim();
+            all = all.Where(item => item.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || (item.DisplayName?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (item.Description?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false));
+        }
+
+        all = query.Sort?.ToLowerInvariant() switch
+        {
+            "displayname" => query.Descending ? all.OrderByDescending(x => x.DisplayName, StringComparer.OrdinalIgnoreCase) : all.OrderBy(x => x.DisplayName, StringComparer.OrdinalIgnoreCase),
+            "resourcecount" => query.Descending ? all.OrderByDescending(x => x.Resources.Length) : all.OrderBy(x => x.Resources.Length),
+            _ => query.Descending ? all.OrderByDescending(x => x.Name, StringComparer.OrdinalIgnoreCase) : all.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase),
+        };
+
+        var materialized = all.ToArray();
+        return new OidcScopeListResponse
+        {
+            TotalCount = materialized.Length,
+            Page = page,
+            PageSize = pageSize,
+            Items = materialized.Skip((page - 1) * pageSize).Take(pageSize).ToArray(),
+        };
     }
 
     public async Task<OidcScopeResponse?> GetByNameAsync(string name, CancellationToken cancellationToken = default)
@@ -205,13 +239,30 @@ internal sealed class OidcScopeService(IOpenIddictScopeManager scopeManager) : I
 
     private async Task<OidcScopeResponse> ToResponseAsync(object scope, CancellationToken cancellationToken)
     {
+        var name = await scopeManager.GetNameAsync(scope, cancellationToken) ?? string.Empty;
+        var clients = await clientService.GetAllAsync(cancellationToken);
+        var permissions = (await permissionTopology.GetResourcesAsync(cancellationToken)).SelectMany(r => r.Permissions)
+            .Where(p => p.ReleaseScopes.Contains(name, StringComparer.OrdinalIgnoreCase))
+            .Select(p => p.Name).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray();
+        var resources = (await scopeManager.GetResourcesAsync(scope, cancellationToken)).ToArray();
         return new OidcScopeResponse
         {
-            Name = await scopeManager.GetNameAsync(scope, cancellationToken) ?? string.Empty,
+            Name = name,
             DisplayName = await scopeManager.GetDisplayNameAsync(scope, cancellationToken),
             Description = await scopeManager.GetDescriptionAsync(scope, cancellationToken),
-            Resources = (await scopeManager.GetResourcesAsync(scope, cancellationToken)).ToArray(),
+            Resources = resources,
+            Clients = clients.Where(c => c.Scopes.Contains(name, StringComparer.OrdinalIgnoreCase)).Select(c => string.IsNullOrWhiteSpace(c.DisplayName) ? c.ClientId : c.DisplayName!).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray(),
+            Permissions = permissions,
+            IsReserved = IsReservedScope(name),
+            ETag = ComputeETag(name, await scopeManager.GetDisplayNameAsync(scope, cancellationToken), await scopeManager.GetDescriptionAsync(scope, cancellationToken), resources),
         };
+    }
+
+    private static string ComputeETag(string name, string? displayName, string? description, IEnumerable<string> resources)
+    {
+        var canonical = name + "\n" + (displayName ?? string.Empty) + "\n" + (description ?? string.Empty) + "\n" + string.Join("\n", resources.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(canonical));
+        return '"' + Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_') + '"';
     }
 
     private static bool IsReservedScope(string scopeName)

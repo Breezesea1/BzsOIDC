@@ -1,4 +1,6 @@
 @implements IDisposable
+@page "/admin"
+@page "/admin/dashboard"
 @using System.Security.Claims
 @using ApexCharts
 @using BzsOIDC.Idp.Client.Services.Dashboard
@@ -454,11 +456,15 @@ else if (_summary is not null)
 
     private void RedirectToLogin()
     {
+        var current = new Uri(NavigationManager.Uri, UriKind.Absolute);
+        var returnUrl = string.IsNullOrWhiteSpace(current.PathAndQuery)
+            ? "/"
+            : $"{current.PathAndQuery}{current.Fragment}";
         var loginPath = QueryHelpers.AddQueryString(
             "/login",
             new Dictionary<string, string?>
             {
-                ["returnUrl"] = "/",
+                ["returnUrl"] = returnUrl,
             });
 
         NavigationManager.NavigateTo(loginPath, forceLoad: true);

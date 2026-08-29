@@ -8,6 +8,8 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using OpenIddict.Abstractions;
 using OpenIddict.Server;
+using BzsOIDC.Contracts;
+using BzsOIDC.Shared.Infrastructure.Http;
 
 namespace BzsOIDC.Idp.Services;
 
@@ -80,6 +82,7 @@ internal sealed class IdpServiceRegistrar(IServiceCollection sc, IConfiguration 
     {
         sc.AddScoped<IOidcConsentPageRenderer, OidcConsentPageRenderer>();
         sc.AddScoped<IOidcConsentLifecycle, OidcConsentLifecycle>();
+        sc.AddSingleton<IOidcConsentRequestProtector, OidcConsentRequestProtector>();
         sc.AddScoped<OidcClientPermissionBackfillService>();
 
         var oidcOptions = cfg.GetSection(OidcSectionName).Get<OidcOptions>();
@@ -143,8 +146,28 @@ internal sealed class IdpServiceRegistrar(IServiceCollection sc, IConfiguration 
             opt.Cookie.SameSite = SameSiteMode.Lax;
             opt.Cookie.HttpOnly = true;
             opt.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-            opt.ExpireTimeSpan = TimeSpan.FromHours(36);
+            // Keep the browser cookie session-only while limiting the server ticket
+            // to twelve hours of sliding inactivity. Remembered sessions are capped
+            // at fourteen days in OnSigningIn below.
+            opt.ExpireTimeSpan = TimeSpan.FromHours(12);
             opt.SlidingExpiration = true;
+            opt.Events.OnSigningIn = context =>
+            {
+                if (context.Properties.IsPersistent)
+                {
+                    context.Properties.ExpiresUtc = DateTimeOffset.UtcNow.AddDays(14);
+                    context.Properties.AllowRefresh = true;
+                }
+                else
+                {
+                    // No ExpiresUtc means the browser receives a session cookie;
+                    // ExpireTimeSpan above still limits the sliding server ticket.
+                    context.Properties.ExpiresUtc = null;
+                    context.Properties.IsPersistent = false;
+                }
+
+                return Task.CompletedTask;
+            };
             opt.Events.OnRedirectToLogin = context =>
             {
                 if (context.Request.Path.StartsWithSegments("/connect/authorize"))
@@ -153,8 +176,29 @@ internal sealed class IdpServiceRegistrar(IServiceCollection sc, IConfiguration 
                     return Task.CompletedTask;
                 }
 
+                if (ApiProblemDetailsWriter.IsApiRequest(context.Request))
+                {
+                    return ApiProblemDetailsWriter.WriteAsync(
+                        context.HttpContext,
+                        StatusCodes.Status401Unauthorized,
+                        ApiErrorCodes.Unauthorized);
+                }
+
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 context.Response.Headers.Location = context.RedirectUri;
+                return Task.CompletedTask;
+            };
+            opt.Events.OnRedirectToAccessDenied = context =>
+            {
+                if (ApiProblemDetailsWriter.IsApiRequest(context.Request))
+                {
+                    return ApiProblemDetailsWriter.WriteAsync(
+                        context.HttpContext,
+                        StatusCodes.Status403Forbidden,
+                        ApiErrorCodes.Forbidden);
+                }
+
+                context.Response.Redirect(context.RedirectUri);
                 return Task.CompletedTask;
             };
         });

@@ -13,7 +13,7 @@ public interface IUserAdministration
     Task<UserAdministrationResult> DeleteAsync(Guid userId, Guid currentUserId, CancellationToken cancellationToken = default);
 }
 
-public sealed record UserAdministrationUser(Guid Id, string UserName, string? Email, bool IsAdmin);
+public sealed record UserAdministrationUser(Guid Id, string UserName, string? Email, bool IsAdmin, string? ETag = null);
 
 public sealed record CreateUserAdministrationRequest(string UserName, string Password, string? Email, bool IsAdmin);
 
@@ -47,7 +47,7 @@ public static class UserAdministrationErrorCodes
     public const string SavedUserCouldNotBeReloaded = "SavedUserCouldNotBeReloaded";
 }
 
-internal sealed class UserAdministration(
+public sealed class UserAdministration(
     UserManager<BzsUser> userManager,
     IdpDbContext dbContext,
     ILookupNormalizer lookupNormalizer) : IUserAdministration
@@ -60,15 +60,18 @@ internal sealed class UserAdministration(
                 role.Id == userRole.RoleId && role.NormalizedName == normalizedAdminRoleName))
             .Select(static userRole => userRole.UserId);
 
-        return await dbContext.Users
+        var users = await dbContext.Users
             .AsNoTracking()
             .OrderBy(static user => user.UserName)
             .Select(user => new UserAdministrationUser(
                 user.Id,
                 user.UserName ?? string.Empty,
                 user.Email,
-                adminUserIds.Contains(user.Id)))
+                adminUserIds.Contains(user.Id),
+                user.ConcurrencyStamp))
             .ToListAsync(cancellationToken);
+
+        return users.Select(user => user with { ETag = ToETag(user.ETag) }).ToArray();
     }
 
     public async Task<UserAdministrationResult> CreateAsync(
@@ -117,6 +120,7 @@ internal sealed class UserAdministration(
 
         user.UserName = request.UserName.Trim();
         user.Email = NormalizeOptional(request.Email);
+        user.ConcurrencyStamp = Guid.NewGuid().ToString();
 
         var updateResult = await userManager.UpdateAsync(user);
         if (!updateResult.Succeeded)
@@ -131,6 +135,8 @@ internal sealed class UserAdministration(
             {
                 return FromIdentityFailure(passwordResult, user.UserName, user.Email);
             }
+
+            await userManager.UpdateSecurityStampAsync(user);
         }
 
         var persistedUser = await userManager.FindByNameAsync(user.UserName);
@@ -139,7 +145,13 @@ internal sealed class UserAdministration(
             return UserAdministrationResult.Failure(SavedUserCouldNotBeReloaded());
         }
 
-        return await SyncAdminRoleAsync(persistedUser, request.IsAdmin, currentUserId);
+        var roleResult = await SyncAdminRoleAsync(persistedUser, request.IsAdmin, currentUserId);
+        if (roleResult.Succeeded)
+        {
+            await userManager.UpdateSecurityStampAsync(persistedUser);
+        }
+
+        return roleResult;
     }
 
     public async Task<UserAdministrationResult> DeleteAsync(
@@ -257,6 +269,12 @@ internal sealed class UserAdministration(
     private static string? NormalizeOptional(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    internal static string ToETag(string? stamp)
+    {
+        var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(stamp ?? string.Empty));
+        return $"\"{Convert.ToBase64String(bytes)}\"";
     }
 
     private static UserAdministrationError Error(string code, params string?[] arguments)

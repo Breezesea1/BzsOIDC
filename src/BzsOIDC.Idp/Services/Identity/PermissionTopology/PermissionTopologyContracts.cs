@@ -41,6 +41,7 @@ public sealed record ProtectedResourceResponse
     public string DisplayName { get; init; } = string.Empty;
     public string? Description { get; init; }
     public bool IsActive { get; init; }
+    public string ETag { get; init; } = string.Empty;
     public PermissionDefinitionResponse[] Permissions { get; init; } = [];
 }
 
@@ -51,6 +52,7 @@ public sealed record PermissionDefinitionResponse
     public string DisplayName { get; init; } = string.Empty;
     public string? Description { get; init; }
     public bool IsActive { get; init; }
+    public string ETag { get; init; } = string.Empty;
     public string[] ReleaseScopes { get; init; } = [];
     public RolePermissionAssignmentResponse[] AssignedRoles { get; init; } = [];
 }
@@ -70,6 +72,24 @@ public sealed record RoleResponse
     public bool IsProtected { get; init; }
     public int PermissionCount { get; init; }
     public string[] Permissions { get; init; } = [];
+    public string ETag { get; init; } = string.Empty;
+}
+
+public sealed record RoleListQuery
+{
+    public string? Search { get; init; }
+    public string? Sort { get; init; }
+    public bool Descending { get; init; }
+    public int Page { get; init; } = 1;
+    public int PageSize { get; init; } = 25;
+}
+
+public sealed record RoleListResponse
+{
+    public IReadOnlyList<RoleResponse> Items { get; init; } = [];
+    public int TotalCount { get; init; }
+    public int Page { get; init; }
+    public int PageSize { get; init; }
 }
 
 public sealed record RoleUpsertRequest
