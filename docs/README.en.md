@@ -2,7 +2,7 @@
 
 [简体中文](./README.zh-CN.md) | [Repository README](../README.md)
 
-BzsOIDC is a `.NET 10` solution for an identity platform centered on `BzsOIDC.Idp`, an ASP.NET Core + Blazor application that uses OpenIddict, EF Core, Redis, PostgreSQL, and .NET Aspire for local orchestration.
+BzsOIDC is a `.NET 10` backend identity platform centered on `BzsOIDC.Idp`, an ASP.NET Core Web API and OpenIddict server that uses EF Core, Redis, PostgreSQL, and .NET Aspire for local orchestration.
 
 ## Repository structure
 
@@ -12,26 +12,23 @@ BzsOIDC/
 │   ├── BzsOIDC.AppHost/                 # Aspire entrypoint
 │   ├── BzsOIDC.AppHost.ServiceDefaults/ # service defaults / OTEL / health
 │   ├── BzsOIDC.Idp/                     # main web app
-│   ├── BzsOIDC.Idp.Client/              # client-side/shared UI services
 │   ├── BzsOIDC.Idp.Migrator/            # database migration executable
 │   └── Shared/
 │       └── BzsOIDC.Shared.Infrastructure/
 └── tests/
     ├── BzsOIDC.Idp.UnitTests/
     ├── BzsOIDC.Idp.IntegrationTests/
-    └── BzsOIDC.Idp.E2ETests/
 ```
 
 ## Tech stack
 
 - .NET 10 / C#
-- ASP.NET Core + Blazor
+- ASP.NET Core Web API
 - OpenIddict
 - EF Core + PostgreSQL
 - Redis
 - .NET Aspire
-- Tailwind CSS + GSAP asset pipeline
-- xUnit, NSubstitute, bUnit, Playwright
+- xUnit, NSubstitute
 
 ## How the app runs locally
 
@@ -52,7 +49,6 @@ In development, the AppHost provides default admin credentials when they are not
 ## Prerequisites
 
 - .NET SDK 10
-- Node.js and npm
 - Aspire CLI available on `PATH`
 - A container runtime supported by Aspire, such as Docker Desktop
 
@@ -77,19 +73,6 @@ aspire run
 dotnet run --project src/BzsOIDC.Idp/BzsOIDC.Idp.csproj
 ```
 
-### Frontend assets
-
-Run these from `src/BzsOIDC.Idp/` when needed:
-
-```bash
-npm install
-npm run css:build
-npm run css:watch
-npm run gsap:copy
-```
-
-`BzsOIDC.Idp.csproj` already runs `css:build` and `gsap:copy` before `Build` and `Publish`. `npm install` is not automatically re-run when `package-lock.json` already exists, so run it manually after dependency changes or on a fresh machine.
-
 ### Database migrations
 
 From `src/BzsOIDC.Idp/`:
@@ -112,23 +95,18 @@ dotnet test BzsOIDC.sln
 ```bash
 dotnet test tests/BzsOIDC.Idp.UnitTests/BzsOIDC.Idp.UnitTests.csproj
 dotnet test tests/BzsOIDC.Idp.IntegrationTests/BzsOIDC.Idp.IntegrationTests.csproj
-dotnet test tests/BzsOIDC.Idp.E2ETests/BzsOIDC.Idp.E2ETests.csproj
 ```
 
 ### Run a single test
 
 ```bash
 dotnet test tests/BzsOIDC.Idp.UnitTests/BzsOIDC.Idp.UnitTests.csproj --filter "FullyQualifiedName=BzsOIDC.Idp.UnitTests.Controllers.PermissionScopesControllerTests.GetByPermission_WhenPermissionEmpty_ReturnsValidationProblem"
-dotnet test tests/BzsOIDC.Idp.E2ETests/BzsOIDC.Idp.E2ETests.csproj --filter "FullyQualifiedName=BzsOIDC.Idp.E2ETests.AuthExperienceE2ETests.LoginPage_AllowsThemeAndLanguageSwitching"
 ```
 
 ### Test layers
 
-- Unit tests: xUnit + NSubstitute + bUnit
+- Unit tests: xUnit + NSubstitute
 - Integration tests: ASP.NET Core TestHost + SQLite
-- E2E tests: Playwright + Aspire
-
-Local E2E execution depends on the `aspire` CLI being installed and available on `PATH`.
 
 ## Documentation
 

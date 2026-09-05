@@ -5,10 +5,7 @@ using Microsoft.AspNetCore.Http;
 namespace BzsOIDC.Idp.Infra.Http;
 
 /// <summary>
-/// Applies the host-level security and cache policy shared by the Server and
-/// hosted WebAssembly frontends. This remains middleware (rather than a
-/// service-worker policy) so rollback and an old browser document continue to
-/// use the server's current asset manifest.
+/// Applies backend security headers and conservative cache policy to responses.
 /// </summary>
 public static partial class StaticAssetHardeningExtensions
 {
@@ -16,9 +13,8 @@ public static partial class StaticAssetHardeningExtensions
     private const string DocumentCacheControl = "no-cache,must-revalidate";
 
     public const string ContentSecurityPolicyReportOnly =
-        "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; " +
-        "script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; " +
-        "img-src 'self' data:; font-src 'self'; connect-src 'self' ws: wss:; worker-src 'self'";
+        "default-src 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; " +
+        "form-action 'self'; connect-src 'self'";
 
     /// <summary>
     /// Adds report-only CSP and baseline security headers, and gives
@@ -50,15 +46,6 @@ public static partial class StaticAssetHardeningExtensions
         if (string.IsNullOrEmpty(value))
         {
             return false;
-        }
-
-        // ASP.NET Core's framework and static web asset endpoints are content
-        // addressed by the generated manifest. Keep these URLs valid for the
-        // entire rollback window.
-        if (value.StartsWith("/_framework/", StringComparison.OrdinalIgnoreCase) ||
-            value.StartsWith("/_content/", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
         }
 
         return FingerprintedFileNameRegex().IsMatch(Path.GetFileName(value));

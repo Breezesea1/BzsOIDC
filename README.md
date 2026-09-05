@@ -3,40 +3,18 @@
 [English Guide](./docs/README.en.md) | [中文文档](./docs/README.zh-CN.md)
 
 `BzsOIDC` 是一个基于 **.NET 10** 的身份平台仓库，核心应用是 `BzsOIDC.Idp`。
-它把 **ASP.NET Core + Blazor + OpenIddict + EF Core + PostgreSQL + Redis + .NET Aspire** 组合成一套可本地编排、可测试、可容器化部署的 OIDC / 身份系统。
+它把 **ASP.NET Core Web API + OpenIddict + EF Core + PostgreSQL + Redis + .NET Aspire** 组合成一套可本地编排、可测试、可容器化部署的 OIDC / 身份系统。
 
 ## 这是一个什么项目
 
-这个仓库当前主要提供一套完整的身份平台体验：
+这个仓库当前主要提供一套纯后端身份平台能力：
 
 - 登录、注销、注册等账号入口
 - OIDC 授权 / Token / UserInfo 等协议能力
-- 用户管理、客户端管理、概览仪表盘等后台界面
+- 用户管理、客户端管理、概览和拓扑 API
 - 权限、范围、种子账号、数据库迁移和本地分布式运行环境
 
-如果你想快速理解这个项目，看下面几张真实页面截图就够了。
-
-## 页面预览
-
-### 登录页
-
-![BzsOIDC 登录页](./docs/login-page.png)
-
-### 首页 / 概览页
-
-![BzsOIDC 首页概览](./docs/home-page.png)
-
-### 用户管理页
-
-![BzsOIDC 用户管理](./docs/user-management-page.png)
-
-### 客户端管理页
-
-![BzsOIDC 客户端管理](./docs/client-management-page.png)
-
-### 角色与权限管理
-
-`BzsOIDC.Idp` 现在也包含完整的角色管理与权限中心：
+后端 API 提供角色与权限管理能力：
 
 - 角色增删改查
 - 角色权限分配迁移到 `/admin/roles`
@@ -57,9 +35,8 @@ flowchart LR
     E --> F
     F --> C
     F --> D
-    F --> G[Blazor UI]
+    F --> G[HTTP API]
     F --> H[OIDC endpoints]
-    G --> I[Admin pages\nusers, clients, dashboard]
 ```
 
 简单理解：
@@ -74,7 +51,6 @@ flowchart LR
 ### 环境要求
 
 - .NET SDK 10
-- Node.js / npm
 - Aspire CLI
 - Docker Desktop（或其他 Aspire 可用容器运行时）
 
@@ -96,14 +72,7 @@ aspire run
 - 用户名：`admin`
 - 密码：`Passw0rd!`
 
-启动后可以直接访问：
-
-- 登录页：`/login`
-- 首页：`/`
-- 用户管理：`/admin/users`
-- 角色管理：`/admin/roles`
-- 客户端管理：`/admin/clients`
-- 权限中心：`/admin/permissions`
+启动后通过 HTTP API 和 OpenIddict 协议端点访问服务；仓库不提供浏览器 UI。
 
 ## 这个仓库里有什么
 
@@ -113,14 +82,12 @@ BzsOIDC/
 │   ├── BzsOIDC.AppHost/                 # Aspire 编排入口
 │   ├── BzsOIDC.AppHost.ServiceDefaults/ # 服务默认配置
 │   ├── BzsOIDC.Idp/                     # 身份平台主站
-│   ├── BzsOIDC.Idp.Client/              # 共享客户端/UI 组件
 │   ├── BzsOIDC.Idp.Migrator/            # 数据库迁移与种子
 │   └── Shared/
 │       └── BzsOIDC.Shared.Infrastructure/
 ├── tests/
 │   ├── BzsOIDC.Idp.UnitTests/
 │   ├── BzsOIDC.Idp.IntegrationTests/
-│   └── BzsOIDC.Idp.E2ETests/
 ├── deploy/
 ├── docs/
 └── .github/workflows/
@@ -130,9 +97,8 @@ BzsOIDC/
 
 仓库目前有三层测试：
 
-- Unit：xUnit + NSubstitute + bUnit
+- Unit：xUnit + NSubstitute
 - Integration：ASP.NET Core TestHost + SQLite
-- E2E：Playwright + Aspire
 
 常用命令：
 
@@ -145,7 +111,6 @@ dotnet test BzsOIDC.sln
 ```bash
 dotnet test tests/BzsOIDC.Idp.UnitTests/BzsOIDC.Idp.UnitTests.csproj
 dotnet test tests/BzsOIDC.Idp.IntegrationTests/BzsOIDC.Idp.IntegrationTests.csproj
-dotnet test tests/BzsOIDC.Idp.E2ETests/BzsOIDC.Idp.E2ETests.csproj
 ```
 
 ## 生产部署相关
@@ -177,9 +142,9 @@ CI 会先完成构建、测试和启动检查，再发布两套 GHCR 镜像。�
 
 ## 一句话总结
 
-`BzsOIDC` 现在是一套偏完整的 **身份平台 / OIDC 管理后台** 仓库：
+`BzsOIDC` 现在是一套纯后端的 **身份平台 / OIDC 服务** 仓库：
 
 - 本地用 Aspire 一键拉起
-- 页面已经覆盖登录、概览、用户和客户端管理
-- 测试链路完整
+- API 覆盖登录、用户、客户端、角色、权限和 OIDC 协议
+- 单元测试与集成测试覆盖核心行为
 - 可以继续往生产部署、接入业务应用和扩展身份能力方向演进

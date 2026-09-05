@@ -4,7 +4,6 @@
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
-        <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
     </PropertyGroup>
 
     <ItemGroup>
@@ -30,7 +29,6 @@
 
     <ItemGroup>
         <ProjectReference Include="..\BzsOIDC.Contracts\BzsOIDC.Contracts.csproj" />
-        <ProjectReference Include="..\BzsOIDC.Idp.Client\BzsOIDC.Idp.Client.csproj" />
         <ProjectReference Include="..\BzsOIDC.AppHost.ServiceDefaults\BzsOIDC.AppHost.ServiceDefaults.csproj" />
         <ProjectReference Include="..\Shared\BzsOIDC.Shared.Infrastructure\BzsOIDC.Shared.Infrastructure.csproj" />
     </ItemGroup>

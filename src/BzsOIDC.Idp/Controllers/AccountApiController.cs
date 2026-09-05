@@ -15,7 +15,8 @@ namespace BzsOIDC.Idp.Controllers;
 public sealed class AccountApiController(
     SignInManager<BzsUser> signInManager,
     IUserService userService,
-    IExternalLoginProviderStore externalLoginProviderStore) : ControllerBase
+    IExternalLoginProviderStore externalLoginProviderStore,
+    IExternalLoginService externalLoginService) : ControllerBase
 {
     [HttpPost("login")]
     [ValidateAntiForgeryToken]
@@ -98,7 +99,7 @@ public sealed class AccountApiController(
             return Problem(ApiErrorCodes.NotFound, StatusCodes.Status404NotFound);
         }
 
-        var callback = "/account/external-login/callback";
+        var callback = "/api/account/external-login/callback";
         if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
         {
             callback = QueryHelpers.AddQueryString(callback, "returnUrl", returnUrl);
@@ -106,6 +107,18 @@ public sealed class AccountApiController(
 
         var properties = signInManager.ConfigureExternalAuthenticationProperties(loginProvider.Scheme, callback);
         return Challenge(properties, loginProvider.Scheme);
+    }
+
+    [HttpGet("external-login/callback")]
+    public async Task<IActionResult> ExternalCallback([FromQuery] string? returnUrl, CancellationToken cancellationToken)
+    {
+        var result = await externalLoginService.SignInAsync(cancellationToken);
+        if (!result.Succeeded)
+        {
+            return Problem(result.ErrorCode ?? ApiErrorCodes.InvalidCredentials, StatusCodes.Status401Unauthorized);
+        }
+
+        return Ok(new AccountActionResponse(SafeReturnUrl(returnUrl)));
     }
 
     private string SafeReturnUrl(string? returnUrl) =>

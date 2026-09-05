@@ -21,13 +21,10 @@ permissions:
 
 env:
   DOTNET_VERSION: 10.0.x
-  NODE_VERSION: "22"
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  E2E_SMOKE_FILTER: Category=Smoke
-  E2E_STARTUP_FILTER: Category=Startup
 
 jobs:
   resolve-version:
@@ -68,13 +65,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: src/BzsOIDC.Idp/package-lock.json
-
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -87,10 +77,6 @@ jobs:
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets', 'global.json') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
-
-      - name: Install frontend dependencies
-        run: npm ci
-        working-directory: src/BzsOIDC.Idp
 
       - name: Restore solution
         run: dotnet restore BzsOIDC.sln
@@ -116,170 +102,16 @@ jobs:
             tests/BzsOIDC.Idp.UnitTests/TestResults/**/*.trx
             tests/BzsOIDC.Idp.IntegrationTests/TestResults/**/*.trx
 
-      - name: Upload Release build outputs for E2E jobs
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-build-outputs
-          include-hidden-files: true
-          path: |
-            src/**/bin/Release/**
-            src/**/obj/Release/**
-            tests/**/bin/Release/**
-            tests/**/obj/Release/**
-
-  e2e-smoke:
-    name: E2E smoke tests
-    runs-on: ubuntu-latest
-    needs: build-test
-    timeout-minutes: 45
-    if: github.event_name == 'pull_request'
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      - name: Download Release build outputs
-        uses: actions/download-artifact@v4
-        with:
-          name: release-build-outputs
-          path: .
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('tests/BzsOIDC.Idp.E2ETests/BzsOIDC.Idp.E2ETests.csproj') }}
-
-      - name: Install Playwright browsers
-        run: pwsh tests/BzsOIDC.Idp.E2ETests/bin/Release/net10.0/playwright.ps1 install --with-deps
-
-      - name: Run E2E smoke tests
-        env:
-          CI: true
-          TESTING__SMOKE__ENABLED: true
-        run: dotnet test tests/BzsOIDC.Idp.E2ETests/BzsOIDC.Idp.E2ETests.csproj -c Release --no-build --filter "${{ env.E2E_SMOKE_FILTER }}" --logger "trx;LogFileName=e2e-smoke-tests.trx"
-
-      - name: Upload E2E smoke artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-smoke-test-results
-          path: |
-            tests/BzsOIDC.Idp.E2ETests/TestResults/**/*.trx
-            test-results/**
-
-  app-startup:
-    name: Application startup smoke
-    runs-on: ubuntu-latest
-    needs: build-test
-    timeout-minutes: 30
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      - name: Download Release build outputs
-        uses: actions/download-artifact@v4
-        with:
-          name: release-build-outputs
-          path: .
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('tests/BzsOIDC.Idp.E2ETests/BzsOIDC.Idp.E2ETests.csproj') }}
-
-      - name: Install Playwright browsers
-        run: pwsh tests/BzsOIDC.Idp.E2ETests/bin/Release/net10.0/playwright.ps1 install --with-deps
-
-      - name: Run application startup smoke test
-        env:
-          CI: true
-          TESTING__SMOKE__ENABLED: true
-        run: dotnet test tests/BzsOIDC.Idp.E2ETests/BzsOIDC.Idp.E2ETests.csproj -c Release --no-build --filter "${{ env.E2E_STARTUP_FILTER }}" --logger "trx;LogFileName=app-startup-tests.trx"
-
-      - name: Upload application startup artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-startup-test-results
-          path: |
-            tests/BzsOIDC.Idp.E2ETests/TestResults/**/*.trx
-            test-results/**
-
-  e2e-full:
-    name: Full E2E suite
-    runs-on: ubuntu-latest
-    needs: build-test
-    timeout-minutes: 45
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')))
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      - name: Download Release build outputs
-        uses: actions/download-artifact@v4
-        with:
-          name: release-build-outputs
-          path: .
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('tests/BzsOIDC.Idp.E2ETests/BzsOIDC.Idp.E2ETests.csproj') }}
-
-      - name: Install Playwright browsers
-        run: pwsh tests/BzsOIDC.Idp.E2ETests/bin/Release/net10.0/playwright.ps1 install --with-deps
-
-      - name: Run full E2E tests
-        env:
-          CI: true
-        run: dotnet test tests/BzsOIDC.Idp.E2ETests/BzsOIDC.Idp.E2ETests.csproj -c Release --no-build --logger "trx;LogFileName=e2e-tests.trx"
-
-      - name: Upload full E2E artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-test-results
-          path: |
-            tests/BzsOIDC.Idp.E2ETests/TestResults/**/*.trx
-            test-results/**
-
   container-images:
     name: Build container images
     runs-on: ubuntu-latest
     needs:
       - resolve-version
       - build-test
-      - e2e-smoke
-      - app-startup
-      - e2e-full
     if: >-
       always() &&
       needs.resolve-version.result == 'success' &&
-      needs.build-test.result == 'success' &&
-      (needs.e2e-smoke.result == 'success' || needs.e2e-smoke.result == 'skipped') &&
-      (needs.app-startup.result == 'success' || needs.app-startup.result == 'skipped') &&
-      (needs.e2e-full.result == 'success' || needs.e2e-full.result == 'skipped')
+      needs.build-test.result == 'success'
 
     steps:
       - name: Checkout

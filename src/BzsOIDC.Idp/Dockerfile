@@ -8,7 +8,6 @@ WORKDIR /src
 
 COPY ["BzsOIDC.sln", "."]
 COPY ["src/BzsOIDC.AppHost.ServiceDefaults/BzsOIDC.AppHost.ServiceDefaults.csproj", "src/BzsOIDC.AppHost.ServiceDefaults/"]
-COPY ["src/BzsOIDC.Idp.Client/BzsOIDC.Idp.Client.csproj", "src/BzsOIDC.Idp.Client/"]
 COPY ["src/BzsOIDC.Idp/BzsOIDC.Idp.csproj", "src/BzsOIDC.Idp/"]
 COPY ["src/Shared/BzsOIDC.Shared.Infrastructure/BzsOIDC.Shared.Infrastructure.csproj", "src/Shared/BzsOIDC.Shared.Infrastructure/"]
 

@@ -42,19 +42,24 @@ internal static class ExternalAuthenticationServiceCollectionExtensions
                 gitHubOptions.Scope.Add("user:email");
                 gitHubOptions.ClaimActions.MapJsonKey("urn:github:name", "name");
                 gitHubOptions.ClaimActions.MapJsonKey(ClaimTypes.Email, "email");
-                gitHubOptions.Events.OnRemoteFailure = context =>
+                gitHubOptions.Events.OnRemoteFailure = async context =>
                 {
                     var loggerFactory = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>();
                     var logger = loggerFactory.CreateLogger("GitHubAuthentication");
                     logger.LogWarning(context.Failure, "GitHub remote authentication failed.");
 
-                    var redirectPath = ExternalAuthenticationFailureResponseBuilder.BuildLoginRedirectPath(
-                        context.Failure,
-                        context.Properties?.RedirectUri);
-
-                    context.Response.Redirect(redirectPath);
+                    context.Response.StatusCode = StatusCodes.Status502BadGateway;
+                    context.Response.ContentType = "application/problem+json";
+                    await context.Response.WriteAsJsonAsync(new
+                    {
+                        type = "https://httpstatuses.com/502",
+                        title = "External authentication failed",
+                        status = StatusCodes.Status502BadGateway,
+                        code = "external_login_failed",
+                        traceId = context.HttpContext.TraceIdentifier,
+                    });
                     context.HandleResponse();
-                    return Task.CompletedTask;
+                    return;
                 };
             });
         }

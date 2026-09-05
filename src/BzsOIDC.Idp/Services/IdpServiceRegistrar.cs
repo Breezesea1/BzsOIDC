@@ -81,7 +81,6 @@ internal sealed class IdpServiceRegistrar(IServiceCollection sc, IConfiguration 
     internal IServiceCollection AddOidc()
     {
         sc.AddIdentityPrincipalServices();
-        sc.AddScoped<IOidcConsentPageRenderer, OidcConsentPageRenderer>();
         sc.AddScoped<IOidcConsentLifecycle, OidcConsentLifecycle>();
         sc.AddScoped<IOidcConsentPreviewService, OidcConsentPreviewService>();
         sc.AddScoped<IOidcConnectService, OidcConnectService>();
@@ -141,9 +140,9 @@ internal sealed class IdpServiceRegistrar(IServiceCollection sc, IConfiguration 
     {
         sc.ConfigureApplicationCookie(opt =>
         {
-            opt.LoginPath = "/login";
-            opt.LogoutPath = "/account/logout";
-            opt.AccessDeniedPath = "/account/denied";
+            opt.LoginPath = "/api/account/login";
+            opt.LogoutPath = "/api/account/logout";
+            opt.AccessDeniedPath = "/api/account/denied";
             opt.Cookie.Name = "bzs.auth";
             opt.Cookie.Path = "/";
             opt.Cookie.SameSite = SameSiteMode.Lax;
@@ -179,30 +178,17 @@ internal sealed class IdpServiceRegistrar(IServiceCollection sc, IConfiguration 
                     return Task.CompletedTask;
                 }
 
-                if (ApiProblemDetailsWriter.IsApiRequest(context.Request))
-                {
-                    return ApiProblemDetailsWriter.WriteAsync(
-                        context.HttpContext,
-                        StatusCodes.Status401Unauthorized,
-                        ApiErrorCodes.Unauthorized);
-                }
-
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                context.Response.Headers.Location = context.RedirectUri;
-                return Task.CompletedTask;
+                return ApiProblemDetailsWriter.WriteAsync(
+                    context.HttpContext,
+                    StatusCodes.Status401Unauthorized,
+                    ApiErrorCodes.Unauthorized);
             };
             opt.Events.OnRedirectToAccessDenied = context =>
             {
-                if (ApiProblemDetailsWriter.IsApiRequest(context.Request))
-                {
-                    return ApiProblemDetailsWriter.WriteAsync(
-                        context.HttpContext,
-                        StatusCodes.Status403Forbidden,
-                        ApiErrorCodes.Forbidden);
-                }
-
-                context.Response.Redirect(context.RedirectUri);
-                return Task.CompletedTask;
+                return ApiProblemDetailsWriter.WriteAsync(
+                    context.HttpContext,
+                    StatusCodes.Status403Forbidden,
+                    ApiErrorCodes.Forbidden);
             };
         });
     }

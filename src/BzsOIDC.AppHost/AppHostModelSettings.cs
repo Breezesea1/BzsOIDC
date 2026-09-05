@@ -7,10 +7,9 @@ public static class AppHostModelSettings
         return string.Equals(smokeEnabled, bool.TrueString, StringComparison.OrdinalIgnoreCase);
     }
 
-    public static string ResolveCacheType(string? e2eTestingEnabled, string? smokeEnabled)
+    public static string ResolveCacheType(string? smokeEnabled)
     {
-        return string.Equals(e2eTestingEnabled, bool.TrueString, StringComparison.OrdinalIgnoreCase)
-               || IsSmokeProfileEnabled(smokeEnabled)
+        return IsSmokeProfileEnabled(smokeEnabled)
             ? "Memory"
             : "Redis";
     }
@@ -24,8 +23,8 @@ public static class AppHostModelSettings
             : postgresConnectionString;
     }
 
-    public static bool ShouldUsePersistentPostgresVolume(string? e2eTestingEnabled)
+    public static bool ShouldUsePersistentPostgresVolume()
     {
-        return !string.Equals(e2eTestingEnabled, bool.TrueString, StringComparison.OrdinalIgnoreCase);
+        return true;
     }
 }

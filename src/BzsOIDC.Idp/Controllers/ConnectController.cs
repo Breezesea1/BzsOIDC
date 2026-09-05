@@ -17,12 +17,10 @@ namespace BzsOIDC.Idp.Controllers;
 [ApiController]
 public sealed class ConnectController(
     IAntiforgery antiforgery,
-    IOidcConsentPageRenderer consentPageRenderer,
     IPermissionTopology permissionTopology,
     IOidcPrincipalFactory oidcPrincipalFactory,
     IOidcConnectService connectService,
     IOidcConsentLifecycle consentLifecycle,
-    IConfiguration configuration,
     IOidcConsentRequestProtector requestProtector) : ControllerBase
 {
     /// <summary>
@@ -105,12 +103,6 @@ public sealed class ConnectController(
                 OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
 
-        if (!HttpMethods.IsPost(Request.Method) && IsWasmFrontendEnabled())
-        {
-            var token = requestProtector.Protect(Request.QueryString.Value ?? string.Empty);
-            return Redirect(QueryHelpers.AddQueryString("/consent", "request", token));
-        }
-
         if (HttpMethods.IsPost(Request.Method))
         {
             if (string.Equals(Request.Form["consent"], "deny", StringComparison.OrdinalIgnoreCase))
@@ -134,8 +126,11 @@ public sealed class ConnectController(
             }
         }
 
-        var clientDisplayName = await ResolveClientDisplayNameAsync(request, cancellationToken);
-        return consentPageRenderer.Render(HttpContext, Request.Query, clientDisplayName, scopes);
+        return Problem(
+            detail: "The resource owner must complete consent in an external client.",
+            statusCode: StatusCodes.Status409Conflict,
+            title: "Consent required",
+            type: "https://docs.bzsoidc.dev/errors/consent-required");
     }
 
     /// <summary>
@@ -293,16 +288,6 @@ public sealed class ConnectController(
         }
 
     }
-
-    private async Task<string> ResolveClientDisplayNameAsync(OpenIddictRequest request, CancellationToken cancellationToken)
-    {
-        return await connectService.ResolveClientDisplayNameAsync(request.ClientId, cancellationToken);
-    }
-
-    private bool IsWasmFrontendEnabled() =>
-        string.Equals(configuration["Frontend:Mode"], "Wasm", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(configuration["Frontend:Mode"], "WebAssembly", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(configuration["Frontend:Mode"], "HostedWasm", StringComparison.OrdinalIgnoreCase);
 
     private bool ValidateConsentRequestToken(string token)
     {

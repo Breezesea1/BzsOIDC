@@ -8,8 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="bunit" Version="2.6.2" />
-    <PackageReference Include="AngleSharp" Version="1.5.0" />
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.11" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
@@ -21,7 +19,6 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\..\src\BzsOIDC.Contracts\BzsOIDC.Contracts.csproj" />
-    <ProjectReference Include="..\..\src\BzsOIDC.Idp.Client\BzsOIDC.Idp.Client.csproj" />
     <ProjectReference Include="..\..\src\BzsOIDC.Idp\BzsOIDC.Idp.csproj" />
   </ItemGroup>
 

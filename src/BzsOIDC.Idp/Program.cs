@@ -1,5 +1,4 @@
 using BzsOIDC.Idp.Infra;
-using BzsOIDC.Idp.Infra.Preferences;
 using BzsOIDC.Idp.Infra.Http;
 using BzsOIDC.Idp.Services;
 using BzsOIDC.Idp.Services.Identity;
@@ -20,11 +19,11 @@ builder.EnrichFromAspire();
 builder.Services.AddLocalization(options => { options.ResourcesPath = "Resources"; });
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
-    var supportedCultures = UiPreferences.SupportedCultureNames
+    var supportedCultures = new[] { "zh-CN", "en-US" }
         .Select(static name => new CultureInfo(name))
         .ToArray();
 
-    options.DefaultRequestCulture = new RequestCulture(UiPreferences.DefaultCulture);
+    options.DefaultRequestCulture = new RequestCulture("zh-CN");
     options.SupportedCultures = supportedCultures;
     options.SupportedUICultures = supportedCultures;
     options.RequestCultureProviders =
@@ -75,9 +74,7 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
-// Keep the HTML shell revalidating while generated framework/static-web-assets
-// URLs remain immutable across the rollback window. CSP stays report-only
-// during the hosted-WASM migration so violations can be measured before cutover.
+// Apply the backend security headers before any API or protocol response.
 app.UseStaticAssetHardening();
 
 if (builder.Configuration.IsSmokeTestingEnabled())
@@ -105,7 +102,10 @@ if (!app.Environment.IsDevelopment())
             return;
         }
 
-        context.Response.Redirect("/Error");
+        await ApiProblemDetailsWriter.WriteAsync(
+            context,
+            StatusCodes.Status500InternalServerError,
+            ApiErrorCodes.Unexpected);
     }));
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
@@ -154,9 +154,6 @@ app.UseWhen(
                 ApiProblemDetailsWriter.CodeForStatus(context.Response.StatusCode));
         }
     }));
-app.UseWhen(
-    context => !ApiProblemDetailsWriter.IsApiRequest(context.Request),
-    browserBranch => browserBranch.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true));
 app.UseForwardedHeaders();
 app.UseHttpsRedirection();
 app.UseRequestLocalization();
@@ -166,11 +163,6 @@ app.UseRateLimiter();
 
 app.UseAntiforgery();
 
-app.MapStaticAssets();
 app.MapControllers();
-
-// API and OIDC controller routes are mapped first. Every browser deep link is
-// then handled by the hosted WebAssembly client's static index.
-app.MapFallbackToFile("{*path:nonfile}", "index.html");
 
 app.Run();

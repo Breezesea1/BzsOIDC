@@ -8,21 +8,19 @@ BzsOIDC/
 ├── src/
 │   ├── BzsOIDC.AppHost/                 # Aspire AppHost
 │   ├── BzsOIDC.AppHost.ServiceDefaults/ # OTEL, health, defaults
-│   ├── BzsOIDC.Idp/                     # ASP.NET Core + Blazor IDP
-│   ├── BzsOIDC.Idp.Client/              # client/shared UI services
+│   ├── BzsOIDC.Idp/                     # ASP.NET Core backend IDP
 │   ├── BzsOIDC.Idp.Migrator/            # DB migration executable
 │   └── Shared/
 │       └── BzsOIDC.Shared.Infrastructure/
 ├── tests/
-│   ├── BzsOIDC.Idp.UnitTests/           # xUnit + NSubstitute + bUnit
+│   ├── BzsOIDC.Idp.UnitTests/           # xUnit + NSubstitute
 │   ├── BzsOIDC.Idp.IntegrationTests/    # xUnit + TestHost + SQLite
-│   └── BzsOIDC.Idp.E2ETests/            # xUnit + Playwright + Aspire
 └── BzsOIDC.sln
 ```
 - Target framework: `net10.0`
 - `Nullable=enable`, `ImplicitUsings=enable`
-- Main stack: ASP.NET Core, Blazor, OpenIddict, EF Core, Aspire
-- Frontend assets live in `src/BzsOIDC.Idp/` and use Tailwind CLI + GSAP copy script
+- Main stack: ASP.NET Core Web API, OpenIddict, EF Core, Aspire
+- The repository is backend-only and ships no browser UI or frontend asset pipeline.
 
 ## 2. Rule files
 Present:
@@ -57,25 +55,14 @@ Preferred distributed entrypoint:
 ```bash
 aspire run
 ```
-This is also what the E2E fixture launches.
+This starts the distributed backend stack.
 
 Run only the IDP directly:
 ```bash
 dotnet run --project src/BzsOIDC.Idp/BzsOIDC.Idp.csproj
 ```
 
-### 3.4 Frontend asset commands
-Run in `src/BzsOIDC.Idp/` when needed:
-```bash
-npm install
-npm run css:build
-npm run css:watch
-npm run gsap:copy
-```
-`BzsOIDC.Idp.csproj` already runs `css:build` and `gsap:copy` before `Build` and `Publish`.
-`npm install` is not automatically re-run when `package-lock.json` already exists, so run it manually after dependency changes or on a fresh machine.
-
-### 3.5 Database migrations
+### 3.4 Database migrations
 From `src/BzsOIDC.Idp/`:
 ```bash
 dotnet ef migrations add <MigrationName> --context IdpDbContext
@@ -93,29 +80,25 @@ dotnet test BzsOIDC.sln --no-build
 ```bash
 dotnet test tests/BzsOIDC.Idp.UnitTests/BzsOIDC.Idp.UnitTests.csproj
 dotnet test tests/BzsOIDC.Idp.IntegrationTests/BzsOIDC.Idp.IntegrationTests.csproj
-dotnet test tests/BzsOIDC.Idp.E2ETests/BzsOIDC.Idp.E2ETests.csproj
 ```
 
 ### 4.3 Run a single test
 ```bash
 dotnet test tests/BzsOIDC.Idp.UnitTests/BzsOIDC.Idp.UnitTests.csproj --filter "FullyQualifiedName=BzsOIDC.Idp.UnitTests.Controllers.PermissionScopesControllerTests.GetByPermission_WhenPermissionEmpty_ReturnsValidationProblem"
-dotnet test tests/BzsOIDC.Idp.E2ETests/BzsOIDC.Idp.E2ETests.csproj --filter "FullyQualifiedName=BzsOIDC.Idp.E2ETests.AuthExperienceE2ETests.LoginPage_AllowsThemeAndLanguageSwitching"
 ```
 
 ### 4.4 Run a class or subset
 ```bash
 dotnet test tests/BzsOIDC.Idp.UnitTests/BzsOIDC.Idp.UnitTests.csproj --filter "FullyQualifiedName~PermissionScopesControllerTests"
 dotnet test tests/BzsOIDC.Idp.IntegrationTests/BzsOIDC.Idp.IntegrationTests.csproj --filter "FullyQualifiedName~ConnectControllerIntegrationTests"
-dotnet test tests/BzsOIDC.Idp.E2ETests/BzsOIDC.Idp.E2ETests.csproj --filter "FullyQualifiedName~AuthExperienceE2ETests"
 ```
 
 ### 4.5 Test notes
-- Unit tests: xUnit + NSubstitute + bUnit
+- Unit tests: xUnit + NSubstitute
 - Integration tests: ASP.NET Core `TestHost` + EF Core SQLite
-- E2E tests: `Microsoft.Playwright.Xunit` + Aspire orchestration
 - `Xunit` is supplied as a global using in each test csproj
 - Trait/category filters are not part of the current suite; prefer `FullyQualifiedName`
-- Local E2E execution expects the `aspire` CLI to be installed and available on `PATH`
+- Aspire smoke execution expects the `aspire` CLI to be installed and available on `PATH`
 
 ## 5. Code style
 Follow the surrounding file before applying generic .NET preferences.
@@ -174,7 +157,7 @@ Follow the surrounding file before applying generic .NET preferences.
 - Use NSubstitute for mocks/stubs in unit tests and some integration tests
 - Keep tests in Arrange / Act / Assert order
 - Use `[Fact]` by default; `[Theory]` + `[InlineData]` appear only where parameterization helps
-If you touch auth, OIDC, migrations, startup wiring, or UI flows, add or run integration/E2E coverage as appropriate.
+If you touch auth, OIDC, migrations, or startup wiring, add or run integration coverage as appropriate.
 
 ## 6. Agent workflow for this repo
 1. Read the target area first; do not guess how services are wired.
@@ -186,7 +169,7 @@ dotnet format BzsOIDC.sln --verify-no-changes --verbosity minimal
 dotnet test <affected project or filtered test>
 ```
 4. For broader changes, finish with `dotnet test BzsOIDC.sln`.
-5. If you changed frontend assets or UI classes under `src/BzsOIDC.Idp/`, make sure the CSS/asset pipeline still works.
+5. If you changed backend startup or protocol behavior, verify the API and protocol endpoints still build and test correctly.
 Keep this file synchronized with the repo whenever projects, test layers, or rule files change.
 
 ## Agent skills
