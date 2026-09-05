@@ -32,21 +32,201 @@ internal sealed class OidcConsentPageRenderer(IAntiforgery antiforgery) : IOidcC
         builder.AppendLine("<!doctype html>");
         builder.AppendLine("<html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
         builder.AppendLine("<title>Authorize application - BzsOIDC</title>");
-        builder.AppendLine("<style>body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;margin:0;background:#0f172a;color:#e2e8f0}.consent-page{min-height:100vh;display:grid;place-items:center;padding:2rem}.consent-card{width:min(44rem,100%);background:#111827;border:1px solid #334155;border-radius:1rem;padding:2rem;box-shadow:0 24px 80px rgba(0,0,0,.35)}.scope-list{display:flex;flex-wrap:wrap;gap:.5rem;margin:1rem 0}.scope{background:#1e293b;border:1px solid #475569;border-radius:999px;padding:.35rem .75rem}.actions{display:flex;gap:.75rem;margin-top:1.5rem}.primary,.secondary{border:0;border-radius:.75rem;padding:.75rem 1rem;font-weight:700}.primary{background:#38bdf8;color:#082f49}.secondary{background:#334155;color:#f8fafc}</style>");
-        builder.AppendLine("</head><body><main class=\"consent-page\"><section class=\"consent-card\">");
-        builder.Append("<p>BzsOIDC authorization request</p><h1>Allow ")
+        builder.AppendLine("<style>");
+        builder.AppendLine("""
+:root {
+    color-scheme: light;
+    --canvas: #e2e7ee;
+    --surface: #f1f4f8;
+    --surface-inset: #d9dfe8;
+    --surface-overlay: #f7f9fc;
+    --text: #1d2735;
+    --muted: #5d6b7b;
+    --border: #9eabbc;
+    --primary: #315ea8;
+    --on-primary: #ffffff;
+    --success: #2f8067;
+    --shadow-raised: 8px 8px 16px rgb(157 169 185 / .62), -8px -8px 16px rgb(255 255 255 / .86);
+    --shadow-inset: inset 4px 4px 8px rgb(157 169 185 / .58), inset -4px -4px 8px rgb(255 255 255 / .78);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: dark;
+        --canvas: #151b24;
+        --surface: #222b37;
+        --surface-inset: #111720;
+        --surface-overlay: #283341;
+        --text: #edf1f6;
+        --muted: #a8b3c2;
+        --border: #657487;
+        --primary: #9cb9ef;
+        --on-primary: #172235;
+        --success: #69d0a7;
+        --shadow-raised: 8px 8px 16px rgb(5 8 13 / .72), -8px -8px 16px rgb(54 67 83 / .42);
+        --shadow-inset: inset 4px 4px 8px rgb(5 8 13 / .72), inset -4px -4px 8px rgb(54 67 83 / .34);
+    }
+}
+
+* { box-sizing: border-box; }
+body {
+    min-block-size: 100dvh;
+    margin: 0;
+    background: var(--canvas);
+    color: var(--text);
+    font-family: "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+.consent-page {
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    min-block-size: 100dvh;
+    place-items: center;
+    overflow: hidden;
+    padding: clamp(1rem, 5vw, 3rem);
+    background: var(--canvas);
+}
+.consent-page::before,
+.consent-page::after {
+    position: absolute;
+    z-index: -1;
+    border-radius: 50%;
+    content: "";
+    filter: blur(80px);
+    pointer-events: none;
+}
+.consent-page::before {
+    inline-size: 28rem;
+    block-size: 28rem;
+    inset-block-start: -12rem;
+    inset-inline-start: -10rem;
+    background: rgb(49 94 168 / .18);
+}
+.consent-page::after {
+    inline-size: 24rem;
+    block-size: 24rem;
+    inset-block-end: -12rem;
+    inset-inline-end: -8rem;
+    background: rgb(47 128 103 / .15);
+}
+.consent-card {
+    display: grid;
+    inline-size: min(46rem, 100%);
+    gap: 1.25rem;
+    align-content: start;
+    border-radius: 1.125rem;
+    padding: clamp(1.5rem, 4vw, 2.5rem);
+    background: var(--surface);
+    box-shadow: var(--shadow-raised);
+}
+.consent-brand {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    color: var(--text);
+    font-weight: 700;
+    letter-spacing: .01em;
+}
+.consent-brand__mark {
+    display: grid;
+    inline-size: 2.5rem;
+    block-size: 2.5rem;
+    place-items: center;
+    border-radius: .8rem;
+    background: var(--surface-inset);
+    box-shadow: var(--shadow-inset);
+    color: var(--primary);
+    font-size: 1.125rem;
+}
+.consent-kicker {
+    margin: 0;
+    color: var(--primary);
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+.consent-card h1 {
+    margin: 0;
+    font-size: clamp(1.35rem, 3vw, 1.75rem);
+    line-height: 1.25;
+}
+.consent-card p { margin: 0; color: var(--muted); }
+.consent-card__header { display: grid; gap: .4rem; }
+.scope-list {
+    display: grid;
+    gap: .6rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.scope {
+    display: flex;
+    align-items: flex-start;
+    gap: .7rem;
+    border-radius: .75rem;
+    padding: .75rem .875rem;
+    background: var(--surface-inset);
+    box-shadow: var(--shadow-inset);
+}
+.scope::before {
+    flex: 0 0 1rem;
+    inline-size: 1rem;
+    block-size: 1rem;
+    margin-block-start: .2rem;
+    border: 2px solid currentColor;
+    border-radius: 50%;
+    color: var(--success);
+    content: "";
+}
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem;
+    margin-block-start: .25rem;
+}
+.actions button {
+    min-block-size: 2.75rem;
+    flex: 1 1 12rem;
+    border: 0;
+    border-radius: .75rem;
+    padding: .55rem 1.15rem;
+    font: inherit;
+    font-weight: 650;
+    cursor: pointer;
+    transition: box-shadow 180ms ease, transform 180ms ease, filter 180ms ease;
+}
+.actions button:hover { filter: brightness(1.05); }
+.actions button:active { box-shadow: var(--shadow-inset); transform: translateY(1px); }
+.actions button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.primary { background: var(--primary); color: var(--on-primary); box-shadow: var(--shadow-raised); }
+.secondary { background: var(--surface-overlay); color: var(--text); box-shadow: var(--shadow-raised); }
+@media (max-width: 38rem) {
+    .actions { display: grid; }
+    .actions button { flex-basis: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .actions button { transition-duration: .01ms; }
+}
+""");
+        builder.AppendLine("</style>");
+        builder.AppendLine("</head><body><main class=\"consent-page\"><section class=\"consent-card\" aria-labelledby=\"consent-heading\">");
+        builder.AppendLine("<div class=\"consent-brand\"><span class=\"consent-brand__mark\" aria-hidden=\"true\">B</span><span>BzsOIDC</span></div>");
+        builder.Append("<div class=\"consent-card__header\"><p class=\"consent-kicker\">BzsOIDC authorization request</p><h1 id=\"consent-heading\">Allow ")
             .Append(WebUtility.HtmlEncode(clientDisplayName))
-            .AppendLine(" to access your account?</h1>");
-        builder.AppendLine("<p>The application is requesting the following scopes.</p><div class=\"scope-list\">");
+            .AppendLine(" to access your account?</h1></div>");
+        builder.AppendLine("<p>The application is requesting the following scopes.</p><ul class=\"scope-list\">");
 
         foreach (var scope in scopes)
         {
-            builder.Append("<span class=\"scope\">")
+            builder.Append("<li class=\"scope\">")
                 .Append(WebUtility.HtmlEncode(scope))
-                .AppendLine("</span>");
+                .AppendLine("</li>");
         }
 
-        builder.Append("</div><form method=\"post\" action=\"")
+        builder.Append("</ul><form method=\"post\" action=\"")
             .Append(WebUtility.HtmlEncode(formAction))
             .AppendLine("\">");
         builder.Append("<input name=\"")

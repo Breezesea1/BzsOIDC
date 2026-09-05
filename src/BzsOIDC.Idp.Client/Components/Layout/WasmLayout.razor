@@ -1,50 +1,110 @@
 @inherits LayoutComponentBase
+@implements IDisposable
 @using System.Globalization
 @using Microsoft.Extensions.Localization
+@using BzsOIDC.Idp.Client.Services.Theme
 @inject IStringLocalizer<NavMenu> L
+@inject NavigationManager NavigationManager
+@inject ThemePreferenceState ThemeState
 
-<div class="wasm-layout-shell">
-    <a class="wasm-skip-link" href="#wasm-main-content">@L["SkipToContent"]</a>
-    <BzsNavigationDrawer Open="_navigationOpen"
-                         OpenChanged="OnNavigationOpenChanged"
+<BzsAppShell Id="demo-app-shell" Class="demo-shell wasm-layout-shell">
+    <a class="wasm-skip-link" href="#main-content">@L["SkipToContent"]</a>
+    <BzsNavigationDrawer Id="demo-navigation-drawer" Class="demo-sidebar wasm-sidebar" Open="@_navigationOpen"
+                         OpenChanged="AcceptNavigationOpenAsync"
                          Variant="BzsNavigationDrawerVariant.Responsive"
                          Position="BzsNavigationDrawerPosition.Start"
-                         CloseOnBackdropClick="true"
-                         CloseOnEscape="true"
-                         InitialFocusSelector="a"
+                         Resizable="true"
+                         MinimumWidth="224"
+                         MaximumWidth="384"
+                         InitialFocusSelector=".demo-navigation-toggle--close"
                          AccessibleName="@L["PrimaryNavigation"]">
-        <WasmNavMenu OnNavigate="CloseNavigation" />
+        <WasmNavMenu OnNavigate="CloseNavigation" OnToggle="ToggleNavigation" />
     </BzsNavigationDrawer>
 
-    <main class="wasm-layout-main">
-        <header class="wasm-layout-topbar">
-            <BzsButton Variant="BzsButtonVariant.Ghost"
+    <BzsAppBar Id="demo-app-bar" Class="demo-header wasm-layout-topbar" Dense="true" Color="BzsAppBarColor.Surface">
+        <div class="wasm-topbar-start">
+            <BzsButton Id="demo-navigation-open"
+                       Class="demo-navigation-toggle demo-navigation-toggle--open wasm-nav-toggle wasm-navigation-toggle--open"
+                       Variant="BzsButtonVariant.Secondary"
                        Size="BzsButtonSize.Small"
+                       StartIcon="@BzsIcons.Menu"
                        AccessibleName="@L["OpenNavigation"]"
-                       AriaExpanded="@_navigationOpen"
-                       Click="OpenNavigation">☰</BzsButton>
-            <span class="wasm-layout-title">@L["AdminArea"]</span>
-            <Preferences CurrentCulture="@CultureInfo.CurrentUICulture.Name" CurrentTheme="system" />
-        </header>
-        <article id="wasm-main-content" class="wasm-layout-content" tabindex="-1">@Body</article>
-    </main>
-</div>
+                       data-demo-navigation-toggle="true"
+                       data-demo-navigation-toggle-mode="open"
+                       aria-controls="demo-navigation-drawer"
+                       aria-expanded="@_navigationOpen"
+                       Click="ToggleNavigation" />
+            <p class="demo-header-context">
+                <span>@L["AdminArea"]</span>
+                <span class="demo-header-separator" aria-hidden="true">/</span>
+                <strong>@CurrentPageTitle</strong>
+            </p>
+            <Preferences CurrentCulture="@CultureInfo.CurrentUICulture.Name" CurrentTheme="@ThemeState.RequestedTheme" />
+        </div>
+    </BzsAppBar>
+    <BzsMainContent Id="main-content" Class="demo-main wasm-layout-content">
+        <article class="demo-content">
+            @Body
+        </article>
+    </BzsMainContent>
+</BzsAppShell>
 
 @code {
     private bool _navigationOpen = true;
 
-    private Task OpenNavigation() {
-        _navigationOpen = true;
+    protected override void OnInitialized()
+    {
+        NavigationManager.LocationChanged += HandleLocationChanged;
+    }
+
+    private string CurrentPageTitle
+    {
+        get
+        {
+            var relative = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+            var path = relative.Split('?', '#')[0].Trim('/');
+
+            if (path.Length == 0)
+            {
+                return L["Dashboard"].Value;
+            }
+
+            return path switch
+            {
+                "admin" or "admin/dashboard" => L["Dashboard"].Value,
+                var p when p.StartsWith("admin/users", StringComparison.Ordinal) => L["Users"].Value,
+                var p when p.StartsWith("admin/roles", StringComparison.Ordinal) => L["Roles"].Value,
+                var p when p.StartsWith("admin/clients", StringComparison.Ordinal) => L["Clients"].Value,
+                var p when p.StartsWith("admin/scopes", StringComparison.Ordinal) => L["Scopes"].Value,
+                var p when p.StartsWith("admin/permissions", StringComparison.Ordinal) => L["Permissions"].Value,
+                var p when p.StartsWith("admin/oidc-topology", StringComparison.Ordinal) => L["Topology"].Value,
+                _ => L["AdminArea"].Value,
+            };
+        }
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        StateHasChanged();
+    }
+
+    private Task ToggleNavigation() {
+        _navigationOpen = !_navigationOpen;
         return Task.CompletedTask;
     }
 
-    private Task CloseNavigation() {
-        _navigationOpen = false;
-        return Task.CompletedTask;
-    }
+    // Keep the drawer persistent after a selection so multiple menu items can
+    // be chosen without an extra reopen gesture at narrow widths.
+    private Task CloseNavigation() => Task.CompletedTask;
 
-    private Task OnNavigationOpenChanged(bool open) {
+    private Task AcceptNavigationOpenAsync(bool open)
+    {
         _navigationOpen = open;
         return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= HandleLocationChanged;
     }
 }

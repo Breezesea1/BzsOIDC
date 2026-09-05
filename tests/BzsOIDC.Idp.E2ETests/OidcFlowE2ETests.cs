@@ -31,9 +31,11 @@ public sealed class OidcFlowE2ETests(AppHostFixture fixture) : E2EPageTest
         await Page.GetByLabel("Client type").SelectOptionAsync("true");
         await Page.GetByLabel("Authentication flow").SelectOptionAsync("AuthorizationCode");
         await Page.GetByLabel("Scopes").FillAsync("openid, profile, email, roles, offline_access, api");
-        await Page.GetByLabel("Redirect URIs").FillAsync(redirectUri);
+        await Page.GetByLabel("Redirect URIs", new() { Exact = true }).FillAsync(redirectUri);
         await Page.GetByLabel("Post-logout redirect URIs").FillAsync(redirectUri);
         await Page.GetByRole(AriaRole.Button, new() { Name = "Create" }).ClickAsync();
+        var createdRow = Page.GetByRole(AriaRole.Row).Filter(new() { HasTextString = clientId });
+        await Expect(createdRow).ToBeVisibleAsync(new() { Timeout = 20000 });
 
         var authorizeUrl = QueryHelpers.AddQueryString(
             fixture.BuildUrl("/connect/authorize"),

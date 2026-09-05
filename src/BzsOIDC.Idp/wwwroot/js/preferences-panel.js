@@ -6,7 +6,15 @@ function getCookie(name) {
         .split("; ")
         .find((row) => row.startsWith(name + "="));
 
-    return match ? decodeURIComponent(match.split("=")[1]) : null;
+    if (!match) {
+        return null;
+    }
+
+    try {
+        return decodeURIComponent(match.substring(name.length + 1));
+    } catch {
+        return null;
+    }
 }
 
 export function getThemeCookie() {
@@ -20,7 +28,10 @@ export function applyTheme(theme) {
         resolved = window.matchMedia(MEDIA_DARK).matches ? "dark" : "light";
     }
 
-    document.documentElement.setAttribute("data-theme", resolved);
+    const root = document.documentElement;
+    root.setAttribute("data-theme", resolved);
+    root.setAttribute("data-bzs-theme", resolved);
+    root.style.colorScheme = resolved;
 }
 
 export function init(widgetElement, dotNetRef) {

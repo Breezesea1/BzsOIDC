@@ -1,10 +1,13 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using BzsOIDC.Idp.Client.Components.Pages
+@using BzsOIDC.Idp.Client.Services.Theme
+@implements IDisposable
+@inject IJSRuntime JS
+@inject ThemePreferenceState ThemeState
 
-<BzsThemeProvider Mode="BzsThemeMode.System" Density="BzsDensity.Compact">
+<BzsThemeProvider Mode="ThemeState.Mode" Density="BzsDensity.Compact">
     <CascadingAuthenticationState>
-        <Router AppAssembly="typeof(App).Assembly"
-                NotFoundPage="typeof(Components.Pages.NotFound)">
+        <Router AppAssembly="typeof(App).Assembly">
             <Found Context="routeData">
                 <CascadingValue Value="routeData">
                     <RouteView RouteData="routeData" DefaultLayout="typeof(Components.Layout.WasmLayout)" />
@@ -12,7 +15,7 @@
                 </CascadingValue>
             </Found>
             <NotFound>
-                <LayoutView Layout="typeof(Components.Layout.WasmLayout)">
+                <LayoutView Layout="typeof(Components.Layout.AuthLayout)">
                     <NotFound />
                 </LayoutView>
             </NotFound>
@@ -22,3 +25,28 @@
     <BzsOverlayHost />
     <SessionSyncHost />
 </BzsThemeProvider>
+
+@code {
+    protected override void OnInitialized()
+    {
+        // Preserve the requested preference rather than the currently resolved
+        // color. BzsThemeProvider must remain in System mode so it can react to
+        // a live OS color-scheme change while the user preference is system.
+        if (JS is IJSInProcessRuntime inProcess)
+        {
+            ThemeState.SetRequestedTheme(inProcess.Invoke<string>("bzsPreferences.getThemePreference"));
+        }
+
+        ThemeState.Changed += HandleThemeChanged;
+    }
+
+    private void HandleThemeChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        ThemeState.Changed -= HandleThemeChanged;
+    }
+}

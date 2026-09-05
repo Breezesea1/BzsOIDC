@@ -3,24 +3,62 @@
 @using BzsOIDC.Idp.Client.Services.Oidc
 @inject IOidcTopologyClient Topology
 
+<PageTitle>OIDC topology</PageTitle>
 <AuthorizeView>
     <Authorized>
-        <section data-testid="oidc-topology-page">
-            <h1>OIDC administration topology</h1>
-            <button type="button" @onclick="RefreshAsync">Refresh</button>
-            @if (_error is not null) { <p role="alert">@_error</p> }
-            @if (_snapshot is null && _error is null) { <p aria-live="polite">Loading…</p> }
+        <section class="admin-page" data-testid="oidc-topology-page">
+            <header class="page-header">
+                <div class="page-header__titles">
+                    <h1>OIDC administration topology</h1>
+                    @if (_snapshot is not null)
+                    {
+                        <p class="page-subtitle">Observed @(_snapshot.ObservedAt.ToLocalTime()) (best-effort, non-atomic)</p>
+                    }
+                </div>
+                <button class="btn btn--ghost" type="button" @onclick="RefreshAsync">Refresh</button>
+            </header>
+
+            @if (_error is not null)
+            {
+                <div class="alert alert--error" role="alert">@_error</div>
+            }
+            @if (_snapshot is null && _error is null)
+            {
+                <p class="loading-note" role="status" aria-live="polite">Loading…</p>
+            }
             @if (_snapshot is not null)
             {
-                <p>Observed @(_snapshot.ObservedAt.ToLocalTime()) (best-effort, non-atomic)</p>
-                <h2>OIDC clients</h2>
-                <ul>@foreach (var client in _snapshot.Clients) { <li>@client.DisplayName (@client.ClientId) — @string.Join(", ", client.Scopes)</li> }</ul>
-                <h2>Release scopes</h2>
-                <ul>@foreach (var scope in _snapshot.Scopes) { <li>@scope.Name — @string.Join(", ", scope.Permissions)</li> }</ul>
+                <div class="permission-topology-grid">
+                    <section class="admin-card topology-panel">
+                        <h2 class="topology-panel__title">OIDC clients</h2>
+                        <ul class="topology-list">
+                            @foreach (var client in _snapshot.Clients)
+                            {
+                                <li>
+                                    <strong>@client.DisplayName</strong>
+                                    <code class="data-table__code">@client.ClientId</code>
+                                    <span class="topology-list__meta">@string.Join(", ", client.Scopes)</span>
+                                </li>
+                            }
+                        </ul>
+                    </section>
+                    <section class="admin-card topology-panel">
+                        <h2 class="topology-panel__title">Release scopes</h2>
+                        <ul class="topology-list">
+                            @foreach (var scope in _snapshot.Scopes)
+                            {
+                                <li>
+                                    <strong>@scope.Name</strong>
+                                    <span class="topology-list__meta">@string.Join(", ", scope.Permissions)</span>
+                                </li>
+                            }
+                        </ul>
+                    </section>
+                </div>
             }
         </section>
     </Authorized>
-    <NotAuthorized><p>Sign in to continue.</p></NotAuthorized>
+    <NotAuthorized><p class="loading-note">Sign in to continue.</p></NotAuthorized>
 </AuthorizeView>
 
 @code {

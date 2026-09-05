@@ -65,14 +65,16 @@ internal sealed class PermissionTopologyClient(IApiHttpClientFactory factory) : 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         try
         {
-            return System.Text.Json.JsonSerializer.Deserialize<RoleListResponse>(json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            return System.Text.Json.JsonSerializer.Deserialize<RoleListResponse>(json, SerializerOptions);
         }
         catch (System.Text.Json.JsonException)
         {
-            var items = System.Text.Json.JsonSerializer.Deserialize<IReadOnlyList<RoleResponse>>(json) ?? [];
+            var items = System.Text.Json.JsonSerializer.Deserialize<IReadOnlyList<RoleResponse>>(json, SerializerOptions) ?? [];
             return new RoleListResponse(items, items.Count, page, pageSize);
         }
     }
+
+    private static readonly System.Text.Json.JsonSerializerOptions SerializerOptions = new() { PropertyNameCaseInsensitive = true };
 
     public Task<RoleResponse?> GetRoleAsync(Guid id, CancellationToken cancellationToken = default)
         => factory.CreateClient().GetFromJsonAsync<RoleResponse>($"api/roles/{id}", cancellationToken);

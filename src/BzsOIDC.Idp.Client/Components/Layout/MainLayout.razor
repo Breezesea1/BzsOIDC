@@ -1,9 +1,11 @@
 @using System.Globalization
 @using System.Text
 @using Microsoft.Extensions.Localization
+@using BzsOIDC.Idp.Client.Services.Theme
 @inherits LayoutComponentBase
 @inject IStringLocalizerFactory LocalizerFactory
 @inject NavigationManager NavigationManager
+@inject ThemePreferenceState ThemeState
 
 <div class="layout-shell">
     <aside class="sidebar-panel @(_isMobileMenuOpen ? "mobile-open" : string.Empty)">
@@ -30,7 +32,7 @@
             </div>
 
             <div class="topbar-actions">
-                <Preferences CurrentCulture="@CurrentCultureName" CurrentTheme="@CurrentThemeName"/>
+                <Preferences CurrentCulture="@CurrentCultureName" CurrentTheme="@ThemeState.RequestedTheme"/>
             </div>
         </header>
 
@@ -53,9 +55,6 @@
 
     private string CurrentCultureName =>
         CultureInfo.CurrentUICulture.Name;
-
-    private string CurrentThemeName =>
-        "system";
 
     private string CurrentPageTitle =>
         ResolveCurrentPageTitle();

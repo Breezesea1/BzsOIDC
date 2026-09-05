@@ -1,69 +1,38 @@
 @page "/not-found"
-@layout WasmLayout
+@layout AuthLayout
 @using Microsoft.Extensions.Localization
 @inject IStringLocalizer<NotFound> L
 
 <PageTitle>@L["PageTitle"]</PageTitle>
 
-<section class="notfound-shell">
-    <div class="notfound-card">
-        <div class="notfound-copy">
-            <div class="notfound-copy-surface">
-                <div class="notfound-copy-header">
-                    <span class="notfound-kicker">@L["StatusKicker"]</span>
-
-                    <div class="notfound-brand" aria-label="OIDC">
-                        <span class="notfound-brand-mark" aria-hidden="true">
-                            <img src="/oidc-brand.jpg" alt="" width="44" height="44" />
-                        </span>
-                        <span class="notfound-brand-text">OIDC</span>
-                    </div>
-                </div>
-
-                <div class="notfound-copy-main">
-                    <div class="notfound-code-inline" aria-hidden="true">404</div>
-                    <h1>@L["Heading"]</h1>
-                    <p class="notfound-lead">@L["Lead"]</p>
-                </div>
-
-                <div class="notfound-actions-panel">
-                    <a class="notfound-primary-link" href="/">
-                        <span>@L["PrimaryAction"]</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                            <path d="m12 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </a>
-
-                    <a class="notfound-secondary-link" href="/login" data-enhance-nav="false">@L["SecondaryAction"]</a>
-                </div>
-            </div>
+<section class="auth-card status-card" aria-labelledby="notfound-heading">
+    <div class="status-card__main">
+        <span class="status-card__kicker">@L["StatusKicker"]</span>
+        <div class="status-card__code" aria-hidden="true">404</div>
+        <h1 id="notfound-heading">@L["Heading"]</h1>
+        <p class="auth-card__lead">@L["Lead"]</p>
+        <div class="auth-action-row">
+            <a class="auth-submit auth-submit--link" href="/">
+                <span>@L["PrimaryAction"]</span>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    <path d="m12 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </a>
+            <a class="auth-secondary" href="/login" data-enhance-nav="false">@L["SecondaryAction"]</a>
         </div>
-
-        <aside class="notfound-aside" aria-label="@L["HelpfulDestinationsAria"]">
-            <div class="notfound-code-panel">
-                <div class="notfound-code" aria-hidden="true">
-                    <span>4</span>
-                    <span>0</span>
-                    <span>4</span>
-                </div>
-            </div>
-
-            <div class="notfound-panel">
-                <p class="notfound-panel-label">@L["HelpfulDestinationsLabel"]</p>
-
-                <a class="notfound-nav-link" href="/">
-                    <span class="notfound-nav-title">@L["HomeLinkTitle"]</span>
-                    <span class="notfound-nav-meta">@L["HomeLinkMeta"]</span>
-                </a>
-
-                <a class="notfound-nav-link" href="/login" data-enhance-nav="false">
-                    <span class="notfound-nav-title">@L["LoginLinkTitle"]</span>
-                    <span class="notfound-nav-meta">@L["LoginLinkMeta"]</span>
-                </a>
-
-                <div class="notfound-tip">@L["BookmarkTip"]</div>
-            </div>
-        </aside>
     </div>
+
+    <aside class="status-card__aside" aria-label="@L["HelpfulDestinationsAria"]">
+        <p class="status-card__aside-label">@L["HelpfulDestinationsLabel"]</p>
+        <a class="status-card__nav-link" href="/">
+            <span class="status-card__nav-title">@L["HomeLinkTitle"]</span>
+            <span class="status-card__nav-meta">@L["HomeLinkMeta"]</span>
+        </a>
+        <a class="status-card__nav-link" href="/login" data-enhance-nav="false">
+            <span class="status-card__nav-title">@L["LoginLinkTitle"]</span>
+            <span class="status-card__nav-meta">@L["LoginLinkMeta"]</span>
+        </a>
+        <p class="status-card__tip">@L["BookmarkTip"]</p>
+    </aside>
 </section>

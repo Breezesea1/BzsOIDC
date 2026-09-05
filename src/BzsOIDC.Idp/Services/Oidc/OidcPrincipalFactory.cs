@@ -1,7 +1,5 @@
 using System.Security.Claims;
-using BzsOIDC.Idp.Models;
 using BzsOIDC.Idp.Services.Identity;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
@@ -11,13 +9,13 @@ namespace BzsOIDC.Idp.Services.Oidc;
 public interface IOidcPrincipalFactory
 {
     IReadOnlyList<string> FilterRequestedScopes(IEnumerable<string> requestedScopes);
-    Task<ClaimsPrincipal> CreateUserPrincipalAsync(BzsUser user);
+    Task<ClaimsPrincipal?> CreateUserPrincipalAsync(Guid userId, CancellationToken cancellationToken = default);
     ClaimsPrincipal CreateClientPrincipal(string clientId, string? displayName);
 }
 
 internal sealed class OidcPrincipalFactory(
-    SignInManager<BzsUser> signInManager,
-    UserManager<BzsUser> userManager,
+    IIdentityPrincipalFactory identityPrincipalFactory,
+    IIdentitySubjectReader identitySubjectReader,
     IOptions<IdentitySeedOptions> identityOptions) : IOidcPrincipalFactory
 {
     public IReadOnlyList<string> FilterRequestedScopes(IEnumerable<string> requestedScopes)
@@ -37,23 +35,33 @@ internal sealed class OidcPrincipalFactory(
             .ToArray();
     }
 
-    public async Task<ClaimsPrincipal> CreateUserPrincipalAsync(BzsUser user)
+    public async Task<ClaimsPrincipal?> CreateUserPrincipalAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var principal = await signInManager.CreateUserPrincipalAsync(user);
-        principal.SetClaim(OpenIddictConstants.Claims.Subject, await userManager.GetUserIdAsync(user));
+        var principal = await identityPrincipalFactory.CreateAsync(userId, cancellationToken);
+        if (principal is null)
+        {
+            return null;
+        }
 
-        var displayName = string.IsNullOrWhiteSpace(user.DisplayName)
-            ? user.UserName
-            : user.DisplayName;
+        var subject = identitySubjectReader.Read(principal);
+        if (subject is null)
+        {
+            return null;
+        }
+
+        principal.SetClaim(OpenIddictConstants.Claims.Subject, subject.Id);
+
+        var displayName = principal.FindFirstValue("display_name") ?? subject.UserName;
 
         if (!string.IsNullOrWhiteSpace(displayName))
         {
             principal.SetClaim(OpenIddictConstants.Claims.Name, displayName);
         }
 
-        if (!string.IsNullOrWhiteSpace(user.Email))
+        var email = principal.FindFirstValue(ClaimTypes.Email);
+        if (!string.IsNullOrWhiteSpace(email))
         {
-            principal.SetClaim(OpenIddictConstants.Claims.Email, user.Email);
+            principal.SetClaim(OpenIddictConstants.Claims.Email, email);
         }
 
         var identity = principal.Identities.FirstOrDefault();
@@ -62,13 +70,13 @@ internal sealed class OidcPrincipalFactory(
             return principal;
         }
 
-        RemoveClaims(identity, ClaimTypes.Name, ClaimTypes.Email, ClaimTypes.Role);
+        RemoveClaims(identity, ClaimTypes.Name, ClaimTypes.Email, ClaimTypes.Role, "display_name");
 
         var existingRoles = identity.FindAll(OpenIddictConstants.Claims.Role)
             .Select(static claim => claim.Value)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var roleName in (await userManager.GetRolesAsync(user)).Distinct(StringComparer.OrdinalIgnoreCase))
+        foreach (var roleName in subject.Roles)
         {
             if (existingRoles.Add(roleName))
             {

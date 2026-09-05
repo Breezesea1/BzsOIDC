@@ -1,8 +1,6 @@
 using System.Security.Claims;
-using BzsOIDC.Idp.Models;
 using BzsOIDC.Idp.Services.Identity;
 using BzsOIDC.Idp.Services.Oidc;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using OpenIddict.Abstractions;
@@ -29,38 +27,23 @@ public sealed class OidcPrincipalFactoryTests
     [Fact]
     public async Task CreateUserPrincipalAsync_RewritesStandardClaimsToOpenIddictClaims()
     {
-        var user = BzsUser.CreateExternal("octocat", "octocat@users.noreply.github.com", "The Octocat");
-        var userManager = Substitute.For<UserManager<BzsUser>>(
-            Substitute.For<IUserStore<BzsUser>>(),
-            Options.Create(new IdentityOptions()),
-            new PasswordHasher<BzsUser>(),
-            Array.Empty<IUserValidator<BzsUser>>(),
-            Array.Empty<IPasswordValidator<BzsUser>>(),
-            new UpperInvariantLookupNormalizer(),
-            new IdentityErrorDescriber(),
-            Substitute.For<IServiceProvider>(),
-            Substitute.For<Microsoft.Extensions.Logging.ILogger<UserManager<BzsUser>>>());
-        var signInManager = Substitute.For<SignInManager<BzsUser>>(
-            userManager,
-            Substitute.For<Microsoft.AspNetCore.Http.IHttpContextAccessor>(),
-            Substitute.For<IUserClaimsPrincipalFactory<BzsUser>>(),
-            Options.Create(new IdentityOptions()),
-            Substitute.For<Microsoft.Extensions.Logging.ILogger<SignInManager<BzsUser>>>(),
-            Substitute.For<Microsoft.AspNetCore.Authentication.IAuthenticationSchemeProvider>(),
-            Substitute.For<IUserConfirmation<BzsUser>>());
+        var identityFactory = Substitute.For<IIdentityPrincipalFactory>();
+        var identityReader = new IdentitySubjectReader();
 
         var identity = new ClaimsIdentity("test");
+        identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, "user-1"));
         identity.AddClaim(new Claim(ClaimTypes.Name, "legacy-name"));
-        identity.AddClaim(new Claim(ClaimTypes.Email, "legacy@example.com"));
+        identity.AddClaim(new Claim(ClaimTypes.Email, "octocat@users.noreply.github.com"));
+        identity.AddClaim(new Claim("display_name", "The Octocat"));
         identity.AddClaim(new Claim(ClaimTypes.Role, "admin"));
         identity.AddClaim(new Claim(OpenIddictConstants.Claims.Role, "admin"));
-        signInManager.CreateUserPrincipalAsync(user).Returns(new ClaimsPrincipal(identity));
-        userManager.GetUserIdAsync(user).Returns("user-1");
-        userManager.GetRolesAsync(user).Returns(Task.FromResult<IList<string>>(["admin", "operator"]));
+        identityFactory.CreateAsync(Guid.Parse("9db5d9dd-7c4d-4be4-bf08-cf9c6241a6cc"), Arg.Any<CancellationToken>())
+            .Returns(new ClaimsPrincipal(identity));
 
-        var sut = new OidcPrincipalFactory(signInManager, userManager, Options.Create(new IdentitySeedOptions()));
+        var sut = new OidcPrincipalFactory(identityFactory, identityReader, Options.Create(new IdentitySeedOptions()));
 
-        var principal = await sut.CreateUserPrincipalAsync(user);
+        var principal = await sut.CreateUserPrincipalAsync(Guid.Parse("9db5d9dd-7c4d-4be4-bf08-cf9c6241a6cc"));
+        Assert.NotNull(principal);
         var resultIdentity = Assert.Single(principal.Identities);
 
         Assert.Equal("user-1", principal.GetClaim(OpenIddictConstants.Claims.Subject));
@@ -69,7 +52,7 @@ public sealed class OidcPrincipalFactoryTests
         Assert.DoesNotContain(resultIdentity.Claims, static claim => claim.Type == ClaimTypes.Name);
         Assert.DoesNotContain(resultIdentity.Claims, static claim => claim.Type == ClaimTypes.Email);
         Assert.DoesNotContain(resultIdentity.Claims, static claim => claim.Type == ClaimTypes.Role);
-        Assert.Equal(["admin", "operator"], resultIdentity.FindAll(OpenIddictConstants.Claims.Role)
+        Assert.Equal(["admin"], resultIdentity.FindAll(OpenIddictConstants.Claims.Role)
             .Select(static claim => claim.Value)
             .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
             .ToArray());
@@ -89,58 +72,27 @@ public sealed class OidcPrincipalFactoryTests
     [Fact]
     public async Task CreateUserPrincipalAsync_WhenDisplayNameMissing_FallsBackToUserName()
     {
-        var user = BzsUser.CreateExternal("octocat", "octocat@users.noreply.github.com", null);
-        var userManager = Substitute.For<UserManager<BzsUser>>(
-            Substitute.For<IUserStore<BzsUser>>(),
-            Options.Create(new IdentityOptions()),
-            new PasswordHasher<BzsUser>(),
-            Array.Empty<IUserValidator<BzsUser>>(),
-            Array.Empty<IPasswordValidator<BzsUser>>(),
-            new UpperInvariantLookupNormalizer(),
-            new IdentityErrorDescriber(),
-            Substitute.For<IServiceProvider>(),
-            Substitute.For<Microsoft.Extensions.Logging.ILogger<UserManager<BzsUser>>>());
-        var signInManager = Substitute.For<SignInManager<BzsUser>>(
-            userManager,
-            Substitute.For<Microsoft.AspNetCore.Http.IHttpContextAccessor>(),
-            Substitute.For<IUserClaimsPrincipalFactory<BzsUser>>(),
-            Options.Create(new IdentityOptions()),
-            Substitute.For<Microsoft.Extensions.Logging.ILogger<SignInManager<BzsUser>>>(),
-            Substitute.For<Microsoft.AspNetCore.Authentication.IAuthenticationSchemeProvider>(),
-            Substitute.For<IUserConfirmation<BzsUser>>());
+        var identityFactory = Substitute.For<IIdentityPrincipalFactory>();
+        var identity = new ClaimsIdentity("test");
+        identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, "user-1"));
+        identity.AddClaim(new Claim(ClaimTypes.Name, "octocat"));
+        identityFactory.CreateAsync(Guid.Parse("9db5d9dd-7c4d-4be4-bf08-cf9c6241a6cc"), Arg.Any<CancellationToken>())
+            .Returns(new ClaimsPrincipal(identity));
 
-        signInManager.CreateUserPrincipalAsync(user).Returns(new ClaimsPrincipal(new ClaimsIdentity("test")));
-        userManager.GetUserIdAsync(user).Returns("user-1");
-        userManager.GetRolesAsync(user).Returns(Task.FromResult<IList<string>>([]));
+        var sut = new OidcPrincipalFactory(identityFactory, new IdentitySubjectReader(), Options.Create(new IdentitySeedOptions()));
 
-        var sut = new OidcPrincipalFactory(signInManager, userManager, Options.Create(new IdentitySeedOptions()));
+        var principal = await sut.CreateUserPrincipalAsync(Guid.Parse("9db5d9dd-7c4d-4be4-bf08-cf9c6241a6cc"));
 
-        var principal = await sut.CreateUserPrincipalAsync(user);
-
+        Assert.NotNull(principal);
         Assert.Equal("octocat", principal.GetClaim(OpenIddictConstants.Claims.Name));
     }
 
     private static OidcPrincipalFactory CreateSut()
     {
-        var userManager = Substitute.For<UserManager<BzsUser>>(
-            Substitute.For<IUserStore<BzsUser>>(),
-            Options.Create(new IdentityOptions()),
-            new PasswordHasher<BzsUser>(),
-            Array.Empty<IUserValidator<BzsUser>>(),
-            Array.Empty<IPasswordValidator<BzsUser>>(),
-            new UpperInvariantLookupNormalizer(),
-            new IdentityErrorDescriber(),
-            Substitute.For<IServiceProvider>(),
-            Substitute.For<Microsoft.Extensions.Logging.ILogger<UserManager<BzsUser>>>());
-        var signInManager = Substitute.For<SignInManager<BzsUser>>(
-            userManager,
-            Substitute.For<Microsoft.AspNetCore.Http.IHttpContextAccessor>(),
-            Substitute.For<IUserClaimsPrincipalFactory<BzsUser>>(),
-            Options.Create(new IdentityOptions()),
-            Substitute.For<Microsoft.Extensions.Logging.ILogger<SignInManager<BzsUser>>>(),
-            Substitute.For<Microsoft.AspNetCore.Authentication.IAuthenticationSchemeProvider>(),
-            Substitute.For<IUserConfirmation<BzsUser>>());
-
-        return new OidcPrincipalFactory(signInManager, userManager, Options.Create(new IdentitySeedOptions()));
+        return new OidcPrincipalFactory(
+            Substitute.For<IIdentityPrincipalFactory>(),
+            Substitute.For<IIdentitySubjectReader>(),
+            Options.Create(new IdentitySeedOptions()));
     }
 }
+

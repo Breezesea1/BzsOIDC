@@ -41,12 +41,20 @@ public sealed class SessionLifecycle(
             session.Invalidate();
             await PublishSessionExpiryAsync();
             var uri = new Uri(navigation.Uri, UriKind.Absolute);
+            var loginPath = ClientPath("login");
+            if (string.Equals(uri.AbsolutePath, loginPath, StringComparison.OrdinalIgnoreCase))
+            {
+                // A stale session cookie also 401s while already on the login page;
+                // force-loading here would reload the same page forever.
+                return;
+            }
+
             var returnUrl = uri.PathAndQuery;
             if (string.IsNullOrWhiteSpace(returnUrl) || !returnUrl.StartsWith('/'))
             {
                 returnUrl = "/";
             }
-            navigation.NavigateTo($"{ClientPath("login")}?returnUrl={Uri.EscapeDataString(returnUrl)}", forceLoad: true);
+            navigation.NavigateTo($"{loginPath}?returnUrl={Uri.EscapeDataString(returnUrl)}", forceLoad: true);
         }
         finally
         {

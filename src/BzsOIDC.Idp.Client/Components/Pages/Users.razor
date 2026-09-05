@@ -4,24 +4,69 @@
 @inject IUsersClient UsersClient
 
 <PageTitle>Users</PageTitle>
-<section class="admin-users" data-testid="users-page">
-    <header><h1>User administration</h1><button type="button" @onclick="BeginCreate">New user</button></header>
-    <div class="user-toolbar"><input aria-label="Search users" @bind="_search" @bind:event="oninput" @onchange="ReloadAsync" placeholder="Search" /></div>
-    @if (_error is not null) { <p role="alert">@_error</p> }
-    <table data-testid="users-table"><thead><tr><th>User name</th><th>Email</th><th>Admin</th><th></th></tr></thead><tbody>
-    @foreach (var user in _items)
+<section class="admin-page" data-testid="users-page">
+    <header class="page-header">
+        <div class="page-header__titles">
+            <h1>User administration</h1>
+            <p class="page-subtitle">Manage accounts, credentials and administrator access.</p>
+        </div>
+        <button class="btn btn--primary" type="button" @onclick="BeginCreate">New user</button>
+    </header>
+
+    <div class="toolbar">
+        <div class="toolbar__search">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" />
+                <path d="m21 21-4.3-4.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+            <input aria-label="Search users" @bind="_search" @bind:event="oninput" @onchange="ReloadAsync" placeholder="Search" />
+        </div>
+    </div>
+
+    @if (_loading)
     {
-        <tr><td>@user.UserName</td><td>@user.Email</td><td>@(user.IsAdmin ? "Yes" : "No")</td><td><button type="button" @onclick="() => BeginEdit(user)">Edit</button><button type="button" @onclick="() => DeleteAsync(user)">Delete</button></td></tr>
+        <p class="loading-note" role="status" aria-live="polite">Loading…</p>
     }
-    </tbody></table>
+
+    @if (_error is not null)
+    {
+        <div class="alert alert--error" role="alert">@_error</div>
+    }
+
+    <div class="admin-card admin-card--table">
+        <table class="data-table" data-testid="users-table">
+            <thead><tr><th>User name</th><th>Email</th><th>Admin</th><th class="data-table__actions-col"></th></tr></thead>
+            <tbody>
+                @foreach (var user in _items)
+                {
+                    <tr>
+                        <td><span class="data-table__primary">@user.UserName</span></td>
+                        <td class="data-table__muted">@user.Email</td>
+                        <td><span class="badge @(user.IsAdmin ? "badge--primary" : "badge--neutral")">@(user.IsAdmin ? "Yes" : "No")</span></td>
+                        <td class="data-table__actions">
+                            <button class="btn btn--ghost btn--small" type="button" @onclick="() => BeginEdit(user)">Edit</button>
+                            <button class="btn btn--danger-ghost btn--small" type="button" @onclick="() => DeleteAsync(user)">Delete</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
     @if (_editing)
     {
-        <form @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <label>User name <input @bind="_model.UserName" required /></label>
-            <label>Email <input type="email" @bind="_model.Email" /></label>
-            <label>Password <input type="password" @bind="_model.Password" /></label>
-            <label><input type="checkbox" @bind="_model.IsAdmin" /> Administrator</label>
-            <button type="submit">Save</button><button type="button" @onclick="CancelEdit">Cancel</button>
+        <form class="editor-card" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <h2 class="editor-card__title">@(_editingId is null ? "New user" : "Edit user")</h2>
+            <div class="field-grid">
+                <label class="field"><span class="field__label">User name</span><input @bind="_model.UserName" required /></label>
+                <label class="field"><span class="field__label">Email</span><input type="email" @bind="_model.Email" /></label>
+                <label class="field"><span class="field__label">Password</span><input type="password" @bind="_model.Password" /></label>
+                <label class="field field--check"><input type="checkbox" @bind="_model.IsAdmin" /> <span>Administrator</span></label>
+            </div>
+            <div class="editor-card__actions">
+                <button class="btn btn--primary" type="submit">Save</button>
+                <button class="btn btn--ghost" type="button" @onclick="CancelEdit">Cancel</button>
+            </div>
         </form>
     }
 </section>
@@ -33,12 +78,14 @@
     private Guid? _editingId;
     private string? _etag;
     private string? _error;
+    private bool _loading;
     private UserEditModel _model = new();
 
     protected override Task OnInitializedAsync() => ReloadAsync();
 
     private async Task ReloadAsync()
     {
+        _loading = true;
         try
         {
             var result = await UsersClient.ListAsync(_search);
@@ -46,6 +93,7 @@
             _error = null;
         }
         catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
     }
 
     private void BeginCreate() { _editing = true; _editingId = null; _etag = null; _model = new(); }

@@ -57,8 +57,12 @@ internal static class ServiceExtensions
 
         sc.AddScoped<RoleManagementPolicy>();
         sc.AddScoped<IUserService, UserService>();
+        sc.AddIdentityPrincipalServices();
         sc.AddScoped<IUserAdministration, UserAdministration>();
-        sc.AddScoped<IPermissionTopology, PermissionTopologyService>();
+        sc.AddScoped<PermissionTopologyService>();
+        sc.AddScoped<IPermissionTopology>(static services => services.GetRequiredService<PermissionTopologyService>());
+        sc.AddScoped<IPermissionTopologyReader>(static services => services.GetRequiredService<PermissionTopologyService>());
+        sc.AddScoped<IPermissionTopologyManager>(static services => services.GetRequiredService<PermissionTopologyService>());
         sc.AddScoped<IOidcPrincipalFactory, OidcPrincipalFactory>();
         sc.AddScoped<IOidcClientProfile, OidcClientProfile>();
         sc.AddScoped<IOidcClientService, OidcClientService>();

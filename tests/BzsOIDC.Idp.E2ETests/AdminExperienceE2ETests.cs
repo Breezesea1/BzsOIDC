@@ -27,6 +27,26 @@ public sealed class AdminExperienceE2ETests(AppHostFixture fixture) : E2EPageTes
     }
 
     [Fact]
+    public async Task SidebarNavigation_AllowsSequentialMenuClicks()
+    {
+        await Page.SetViewportSizeAsync(390, 844);
+        await AppUi.LoginAsAdminAsync(this, fixture, "/admin");
+        await AppUi.WaitForAppReadyAsync(this);
+
+        var usersLink = Page.Locator("a.sidebar-nav-item[href='/admin/users']");
+        var clientsLink = Page.Locator("a.sidebar-nav-item[href='/admin/clients']");
+        await Expect(usersLink).ToBeVisibleAsync();
+        await Expect(clientsLink).ToBeVisibleAsync();
+
+        await usersLink.ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new Regex("/admin/users", RegexOptions.IgnoreCase));
+        await Expect(Page.Locator("[data-bzs-navigation-drawer]")).ToHaveAttributeAsync("data-bzs-open", "true");
+
+        await clientsLink.ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new Regex("/admin/clients", RegexOptions.IgnoreCase));
+    }
+
+    [Fact]
     public async Task UserManagement_AllowsCreateEditAndDeleteUser()
     {
         var userName = $"e2e-user-{Guid.NewGuid():N}"[..17];

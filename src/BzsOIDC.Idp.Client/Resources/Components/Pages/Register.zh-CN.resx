@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, ...</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, ...</value>
+  </resheader>
+  <data name="PageTitle" xml:space="preserve"><value>创建账户</value></data>
+  <data name="Heading" xml:space="preserve"><value>创建账户</value></data>
+  <data name="Subtitle" xml:space="preserve"><value>注册一个 BzsOIDC 账户</value></data>
+  <data name="Username" xml:space="preserve"><value>用户名</value></data>
+  <data name="Email" xml:space="preserve"><value>邮箱</value></data>
+  <data name="Password" xml:space="preserve"><value>密码</value></data>
+  <data name="ConfirmPassword" xml:space="preserve"><value>确认密码</value></data>
+  <data name="Submit" xml:space="preserve"><value>创建账户</value></data>
+  <data name="Submitting" xml:space="preserve"><value>正在创建…</value></data>
+  <data name="HaveAccount" xml:space="preserve"><value>已有账户？</value></data>
+  <data name="SignIn" xml:space="preserve"><value>登录</value></data>
+  <data name="ValidationError" xml:space="preserve"><value>请检查输入的内容。</value></data>
+  <data name="GenericError" xml:space="preserve"><value>暂时无法创建账户。</value></data>
+</root>

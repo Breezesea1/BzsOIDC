@@ -1,17 +1,20 @@
 using System.Globalization;
 using ApexCharts;
 using Bzs.Blazor;
+using BzsOIDC.Idp.Client;
 using BzsOIDC.Idp.Client.Services.Dashboard;
 using BzsOIDC.Idp.Client.Services.Session;
 using BzsOIDC.Idp.Client.Services.Users;
 using BzsOIDC.Idp.Client.Services.Scopes;
 using BzsOIDC.Idp.Client.Services.Permissions;
 using BzsOIDC.Idp.Client.Services.Oidc;
+using BzsOIDC.Idp.Client.Services.Theme;
 using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.JSInterop;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
+builder.RootComponents.Add<App>("#app");
 
 builder.Services.AddLocalization(options =>
 {
@@ -28,6 +31,7 @@ builder.Services.AddOidcClientsClient();
 builder.Services.AddPermissionTopologyClient();
 builder.Services.AddOidcTopologyClient();
 builder.Services.AddApexCharts();
+builder.Services.AddScoped<ThemePreferenceState>();
 
 var host = builder.Build();
 

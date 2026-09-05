@@ -51,4 +51,5 @@
     <value>权限中心</value>
   </data>
   <data name="Roles" xml:space="preserve"><value>角色</value></data>
+  <data name="Topology" xml:space="preserve"><value>OIDC 拓扑</value></data>
 </root>

@@ -3,9 +3,11 @@
 @using Microsoft.Extensions.Localization
 @using System.Text
 @using BzsOIDC.Idp.Client.Infra.Blazor
+@using BzsOIDC.Idp.Client.Services.Theme
 @inject IStringLocalizer<Preferences> L
 @inject IJSRuntime JS
 @inject NavigationManager Nav
+@inject ThemePreferenceState ThemeState
 
 <div class="pref-widget" @ref="_widgetRef">
     <button class="pref-trigger"
@@ -150,6 +152,7 @@
         if (string.Equals(kind, "theme", StringComparison.OrdinalIgnoreCase))
         {
             _currentTheme = value;
+            ThemeState.SetRequestedTheme(value);
             if (_prefModule is not null)
             {
                 await _prefModule.InvokeVoidAsync("applyTheme", value);
@@ -171,6 +174,7 @@
     private async Task SetTheme(string theme)
     {
         _currentTheme = theme;
+        ThemeState.SetRequestedTheme(theme);
         _open = false;
 
         if (_prefModule is not null)

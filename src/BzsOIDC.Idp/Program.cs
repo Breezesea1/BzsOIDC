@@ -35,7 +35,7 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
 });
 
 // Add services to the container.
-builder.Services.AddControllers(options => options.Filters.Add<ApiProblemDetailsResultFilter>())
+builder.Services.AddControllersWithViews(options => options.Filters.Add<ApiProblemDetailsResultFilter>())
     .ConfigureApiBehaviorOptions(options =>
     {
         options.InvalidModelStateResponseFactory = context =>

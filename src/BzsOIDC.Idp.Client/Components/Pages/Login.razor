@@ -1,37 +1,70 @@
 @page "/login"
+@layout AuthLayout
 @using System.Net
 @using System.Net.Http.Json
 @using Microsoft.AspNetCore.WebUtilities
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.Extensions.Localization
 @using BzsOIDC.Contracts
 @using BzsOIDC.Idp.Client.Services.Session
 @inject IApiHttpClientFactory ApiClients
 @inject NavigationManager Navigation
 @inject IAntiforgeryTokenStore Antiforgery
 @inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IStringLocalizer<Login> L
 
-<PageTitle>Sign in</PageTitle>
-<main class="auth-page" aria-labelledby="login-heading">
-    <h1 id="login-heading">Sign in</h1>
+<PageTitle>@L["PageTitle"]</PageTitle>
+<section class="auth-card" aria-labelledby="login-heading">
+    <header class="auth-card__header">
+        <h1 id="login-heading">@L["Heading"]</h1>
+        <p>@L["Subtitle"]</p>
+    </header>
+
     @if (!string.IsNullOrWhiteSpace(_error))
     {
-        <div id="login-error" role="alert" aria-live="assertive">@_error</div>
+        <div id="login-error" class="auth-alert" role="alert" aria-live="assertive">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+                <path d="M12 8v4M12 16h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+            <span>@_error</span>
+        </div>
     }
-    <EditForm Model="_model" OnValidSubmit="SubmitAsync" aria-busy="@_busy">
+
+    <EditForm Model="_model" OnValidSubmit="SubmitAsync" aria-busy="@_busy" class="auth-form">
         <DataAnnotationsValidator />
-        <label for="username">Username</label>
-        <InputText id="username" @bind-Value="_model.UserName" autocomplete="username" aria-describedby="login-error" />
-        <label for="password">Password</label>
-        <InputText id="password" type="password" @bind-Value="_model.Password" autocomplete="current-password" aria-describedby="login-error" />
-        <label><InputCheckbox @bind-Value="_model.RememberMe" /> Remember me</label>
-        <button type="submit" disabled="@_busy" aria-describedby="login-status">@(_busy ? "Signing in…" : "Sign in")</button>
-        <span id="login-status" role="status" aria-live="polite" aria-atomic="true">@(_busy ? "Signing in…" : string.Empty)</span>
+        <div class="auth-field">
+            <label for="username">@L["Username"]</label>
+            <input id="username" @bind="_model.UserName" @bind:event="oninput" autocomplete="username" aria-describedby="@(_error is null ? null : "login-error")" />
+        </div>
+        <div class="auth-field">
+            <label for="password">@L["Password"]</label>
+            <input id="password" type="password" @bind="_model.Password" @bind:event="oninput" autocomplete="current-password" aria-describedby="@(_error is null ? null : "login-error")" />
+        </div>
+        <div class="auth-row">
+            <label class="auth-remember"><InputCheckbox @bind-Value="_model.RememberMe" /> @L["RememberMe"]</label>
+        </div>
+        <button class="auth-submit" type="submit" disabled="@_busy" aria-describedby="login-status">
+            <span class="auth-submit__spinner" aria-hidden="true"></span>
+            <span>@(_busy ? L["Submitting"] : L["Submit"])</span>
+        </button>
+        <span id="login-status" class="auth-status" role="status" aria-live="polite" aria-atomic="true">@(_busy ? L["Submitting"].Value : string.Empty)</span>
     </EditForm>
-    @foreach (var provider in _providers)
+
+    @if (_providers.Count > 0)
     {
-        <a href="@BuildExternalHref(provider.RouteSegment)">Continue with @provider.DisplayName</a>
+        <div class="auth-divider" role="separator"><span>@L["ExternalDivider"]</span></div>
+        <div class="auth-external-list">
+            @foreach (var provider in _providers)
+            {
+                <a class="auth-external" href="@BuildExternalHref(provider.RouteSegment)">@L["ContinueWith", provider.DisplayName]</a>
+            }
+        </div>
     }
-    <p><a href="@BuildRegisterHref()">Create an account</a></p>
-</main>
+
+    <p class="auth-switch">@L["NoAccount"] <a href="@BuildRegisterHref()">@L["CreateAccount"]</a></p>
+</section>
 
 @code {
     [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
@@ -43,6 +76,13 @@
 
     protected override async Task OnInitializedAsync()
     {
+        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (authenticationState.User.Identity?.IsAuthenticated == true)
+        {
+            Navigation.NavigateTo(ToClientPath(ReturnUrl), forceLoad: true);
+            return;
+        }
+
         try
         {
             using var client = ApiClients.CreateClient();
@@ -85,11 +125,11 @@
             }
 
             var problem = await ApiProblemDetailsMapper.ReadAsync(response);
-            _error = problem?.Code == ApiErrorCodes.InvalidCredentials ? "Invalid credentials." : "Unable to sign in.";
+            _error = problem?.Code == ApiErrorCodes.InvalidCredentials ? L["InvalidCredentials"].Value : L["GenericError"].Value;
         }
         catch (HttpRequestException)
         {
-            _error = "Unable to sign in.";
+            _error = L["GenericError"].Value;
         }
         finally
         {

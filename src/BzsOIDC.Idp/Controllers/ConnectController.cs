@@ -1,7 +1,6 @@
 using System.Security.Claims;
-using BzsOIDC.Idp.Models;
-using BzsOIDC.Idp.Services.Oidc;
 using BzsOIDC.Idp.Services.Identity;
+using BzsOIDC.Idp.Services.Oidc;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication;
@@ -17,13 +16,11 @@ namespace BzsOIDC.Idp.Controllers;
 
 [ApiController]
 public sealed class ConnectController(
-    SignInManager<BzsUser> signInManager,
-    UserManager<BzsUser> userManager,
-    IOpenIddictApplicationManager applicationManager,
     IAntiforgery antiforgery,
     IOidcConsentPageRenderer consentPageRenderer,
     IPermissionTopology permissionTopology,
     IOidcPrincipalFactory oidcPrincipalFactory,
+    IOidcConnectService connectService,
     IOidcConsentLifecycle consentLifecycle,
     IConfiguration configuration,
     IOidcConsentRequestProtector requestProtector) : ControllerBase
@@ -48,18 +45,14 @@ public sealed class ConnectController(
             }, IdentityConstants.ApplicationScheme);
         }
 
-        var user = await userManager.GetUserAsync(cookieAuthResult.Principal);
+        var scopes = oidcPrincipalFactory.FilterRequestedScopes(request.GetScopes()).ToArray();
+        var user = await connectService.CreateUserPrincipalAsync(cookieAuthResult.Principal, scopes, permissionTopology, cancellationToken);
         if (user is null)
         {
             return Challenge(new AuthenticationProperties
             {
                 RedirectUri = Request.PathBase + Request.Path + Request.QueryString,
             }, IdentityConstants.ApplicationScheme);
-        }
-
-        if (!await signInManager.CanSignInAsync(user))
-        {
-            return Forbid(IdentityConstants.ApplicationScheme);
         }
 
         if (HttpMethods.IsPost(Request.Method) && !await ValidateAntiforgeryRequestAsync())
@@ -71,12 +64,8 @@ public sealed class ConnectController(
             });
         }
 
-        var principal = await oidcPrincipalFactory.CreateUserPrincipalAsync(user);
-        var scopes = oidcPrincipalFactory.FilterRequestedScopes(request.GetScopes()).ToArray();
-        principal.SetScopes(scopes);
-        await PermissionClaimDestinationsHandler.ApplyDestinationsAsync(principal, permissionTopology, cancellationToken);
-
-        var subject = principal.GetClaim(OpenIddictConstants.Claims.Subject) ?? await userManager.GetUserIdAsync(user);
+        var principal = user.Principal;
+        var subject = user.Subject;
         var consentResult = await consentLifecycle.EvaluateAsync(
             new OidcConsentRequest(
                 request.ClientId,
@@ -175,30 +164,17 @@ public sealed class ConnectController(
                 return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
             }
 
-            var user = await userManager.FindByIdAsync(subject);
-            if (user is null)
-            {
-                return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-            }
-
-            if (!await signInManager.CanSignInAsync(user))
-            {
-                return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-            }
-
-            var refreshedPrincipal = await oidcPrincipalFactory.CreateUserPrincipalAsync(user);
-            refreshedPrincipal.SetScopes(principal.GetScopes());
-
-            var authorizationId = principal.GetAuthorizationId();
-            if (!string.IsNullOrWhiteSpace(authorizationId))
-            {
-                refreshedPrincipal.SetAuthorizationId(authorizationId);
-            }
-
-            await PermissionClaimDestinationsHandler.ApplyDestinationsAsync(refreshedPrincipal, permissionTopology,
+            var refreshedPrincipal = await connectService.RefreshUserPrincipalAsync(
+                subject,
+                principal.GetScopes().ToArray(),
+                principal.GetAuthorizationId(),
+                permissionTopology,
                 cancellationToken);
-
-            return SignIn(refreshedPrincipal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            if (refreshedPrincipal is null)
+            {
+                return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            }
+            return SignIn(refreshedPrincipal.Principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
 
         if (request.IsClientCredentialsGrantType())
@@ -208,19 +184,14 @@ public sealed class ConnectController(
                 return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
             }
 
-            var application = await applicationManager.FindByClientIdAsync(request.ClientId, cancellationToken);
-            if (application is null)
-            {
-                return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-            }
-
-            var displayName = await applicationManager.GetDisplayNameAsync(application, cancellationToken);
-            var principal = oidcPrincipalFactory.CreateClientPrincipal(request.ClientId, displayName);
-            principal.SetScopes(oidcPrincipalFactory.FilterRequestedScopes(request.GetScopes()));
-            await PermissionClaimDestinationsHandler.ApplyDestinationsAsync(principal, permissionTopology,
+            var principal = await connectService.CreateClientPrincipalAsync(
+                request.ClientId,
+                request.GetScopes().ToArray(),
+                permissionTopology,
                 cancellationToken);
-
-            return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            return principal is null
+                ? Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)
+                : SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
 
         return BadRequest(new
@@ -246,34 +217,19 @@ public sealed class ConnectController(
             return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
 
-        var user = await userManager.FindByIdAsync(subject);
+        var user = await connectService.GetUserInfoAsync(User, cancellationToken);
         if (user is null)
         {
             return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
 
-        var roles = User.Claims
-            .Where(static claim =>
-                string.Equals(claim.Type, ClaimTypes.Role, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(claim.Type, OpenIddictConstants.Claims.Role, StringComparison.OrdinalIgnoreCase))
-            .Select(static c => c.Value)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        var permissions = User.FindAll(SharedPermissionConstants.ClaimType)
-            .Select(static c => c.Value)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
         var response = new Dictionary<string, object?>
         {
             [OpenIddictConstants.Claims.Subject] = subject,
-            [OpenIddictConstants.Claims.Name] = User.GetClaim(OpenIddictConstants.Claims.Name)
-                                                 ?? User.Identity?.Name
-                                                 ?? (string.IsNullOrWhiteSpace(user.DisplayName) ? user.UserName : user.DisplayName),
-            [OpenIddictConstants.Claims.Email] = User.FindFirstValue(ClaimTypes.Email) ?? user.Email,
-            [OpenIddictConstants.Claims.Role] = roles,
-            [SharedPermissionConstants.ClaimType] = permissions,
+            [OpenIddictConstants.Claims.Name] = user.Name,
+            [OpenIddictConstants.Claims.Email] = user.Email,
+            [OpenIddictConstants.Claims.Role] = user.Roles,
+            [SharedPermissionConstants.ClaimType] = user.Permissions,
         };
 
         return Ok(response
@@ -340,20 +296,7 @@ public sealed class ConnectController(
 
     private async Task<string> ResolveClientDisplayNameAsync(OpenIddictRequest request, CancellationToken cancellationToken)
     {
-        if (!string.IsNullOrWhiteSpace(request.ClientId))
-        {
-            var application = await applicationManager.FindByClientIdAsync(request.ClientId, cancellationToken);
-            if (application is not null)
-            {
-                var displayName = await applicationManager.GetDisplayNameAsync(application, cancellationToken);
-                if (!string.IsNullOrWhiteSpace(displayName))
-                {
-                    return displayName;
-                }
-            }
-        }
-
-        return request.ClientId ?? "the client";
+        return await connectService.ResolveClientDisplayNameAsync(request.ClientId, cancellationToken);
     }
 
     private bool IsWasmFrontendEnabled() =>

@@ -1,33 +1,59 @@
 @page "/register"
+@layout AuthLayout
 @using System.Net.Http.Json
 @using Microsoft.AspNetCore.WebUtilities
+@using Microsoft.Extensions.Localization
 @using BzsOIDC.Contracts
 @using BzsOIDC.Idp.Client.Services.Session
 @inject IApiHttpClientFactory ApiClients
 @inject NavigationManager Navigation
+@inject IStringLocalizer<Register> L
 
-<PageTitle>Create account</PageTitle>
-<main class="auth-page" aria-labelledby="register-heading">
-    <h1 id="register-heading">Create account</h1>
+<PageTitle>@L["PageTitle"]</PageTitle>
+<section class="auth-card" aria-labelledby="register-heading">
+    <header class="auth-card__header">
+        <h1 id="register-heading">@L["Heading"]</h1>
+        <p>@L["Subtitle"]</p>
+    </header>
+
     @if (!string.IsNullOrWhiteSpace(_error))
     {
-        <div id="register-error" role="alert" aria-live="assertive">@_error</div>
+        <div id="register-error" class="auth-alert" role="alert" aria-live="assertive">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+                <path d="M12 8v4M12 16h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+            <span>@_error</span>
+        </div>
     }
-    <EditForm Model="_model" OnValidSubmit="SubmitAsync" aria-busy="@_busy">
+
+    <EditForm Model="_model" OnValidSubmit="SubmitAsync" aria-busy="@_busy" class="auth-form">
         <DataAnnotationsValidator />
-        <label for="register-username">Username</label>
-        <InputText id="register-username" @bind-Value="_model.UserName" autocomplete="username" aria-describedby="register-error" />
-        <label for="register-email">Email</label>
-        <InputText id="register-email" @bind-Value="_model.Email" autocomplete="email" aria-describedby="register-error" />
-        <label for="register-password">Password</label>
-        <InputText id="register-password" type="password" @bind-Value="_model.Password" autocomplete="new-password" aria-describedby="register-error" />
-        <label for="register-confirm-password">Confirm password</label>
-        <InputText id="register-confirm-password" type="password" @bind-Value="_model.ConfirmPassword" autocomplete="new-password" aria-describedby="register-error" />
-        <button type="submit" disabled="@_busy" aria-describedby="register-status">@(_busy ? "Creating account…" : "Create account")</button>
-        <span id="register-status" role="status" aria-live="polite" aria-atomic="true">@(_busy ? "Creating account…" : string.Empty)</span>
+        <div class="auth-field">
+            <label for="register-username">@L["Username"]</label>
+            <InputText id="register-username" @bind-Value="_model.UserName" autocomplete="username" aria-describedby="@(_error is null ? null : "register-error")" />
+        </div>
+        <div class="auth-field">
+            <label for="register-email">@L["Email"]</label>
+            <InputText id="register-email" @bind-Value="_model.Email" autocomplete="email" aria-describedby="@(_error is null ? null : "register-error")" />
+        </div>
+        <div class="auth-field">
+            <label for="register-password">@L["Password"]</label>
+            <InputText id="register-password" type="password" @bind-Value="_model.Password" autocomplete="new-password" aria-describedby="@(_error is null ? null : "register-error")" />
+        </div>
+        <div class="auth-field">
+            <label for="register-confirm-password">@L["ConfirmPassword"]</label>
+            <InputText id="register-confirm-password" type="password" @bind-Value="_model.ConfirmPassword" autocomplete="new-password" aria-describedby="@(_error is null ? null : "register-error")" />
+        </div>
+        <button class="auth-submit" type="submit" disabled="@_busy" aria-describedby="register-status">
+            <span class="auth-submit__spinner" aria-hidden="true"></span>
+            <span>@(_busy ? L["Submitting"] : L["Submit"])</span>
+        </button>
+        <span id="register-status" class="auth-status" role="status" aria-live="polite" aria-atomic="true">@(_busy ? L["Submitting"].Value : string.Empty)</span>
     </EditForm>
-    <p><a href="@BuildLoginHref()">Sign in</a></p>
-</main>
+
+    <p class="auth-switch">@L["HaveAccount"] <a href="@BuildLoginHref()">@L["SignIn"]</a></p>
+</section>
 
 @code {
     [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
@@ -53,11 +79,11 @@
             }
 
             var problem = await ApiProblemDetailsMapper.ReadAsync(response);
-            _error = problem?.Code == ApiErrorCodes.ValidationFailed ? "Check the entered values." : "Unable to create account.";
+            _error = problem?.Code == ApiErrorCodes.ValidationFailed ? L["ValidationError"].Value : L["GenericError"].Value;
         }
         catch (HttpRequestException)
         {
-            _error = "Unable to create account.";
+            _error = L["GenericError"].Value;
         }
         finally
         {

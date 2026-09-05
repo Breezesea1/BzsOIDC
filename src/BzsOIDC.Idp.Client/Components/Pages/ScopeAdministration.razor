@@ -5,36 +5,84 @@
 <PageTitle>Scopes</PageTitle>
 <AuthorizeView>
     <Authorized>
-        <h1>Scopes</h1>
-        <div class="scope-toolbar">
-            <input aria-label="Search scopes" @bind="_search" @bind:event="oninput" />
-            <button type="button" @onclick="Refresh">Refresh</button>
-            <button type="button" @onclick="BeginCreate">New scope</button>
-        </div>
-        @if (_model is null)
-        {
-            <p>Loading…</p>
-        }
-        else
-        {
-            <table data-testid="scopes-table"><thead><tr><th>Name</th><th>Display name</th><th>Resources</th><th>Protected resources</th><th>Permissions</th><th></th></tr></thead>
-            <tbody>@foreach (var item in _model.Items)
-            {<tr><td>@item.Name</td><td>@item.DisplayName</td><td>@string.Join(", ", item.Resources)</td><td>@string.Join(", ", item.Clients)</td><td>@string.Join(", ", item.Permissions)</td><td><button type="button" @onclick="() => BeginEdit(item)">Edit</button>@if (!item.IsReserved) { <button type="button" @onclick="() => DeleteAsync(item)">Delete</button> }</td></tr>}</tbody></table>
-            <p>Showing @_model.Items.Count of @_model.TotalCount</p>
-        }
-        @if (_editor is not null)
-        {
-            <section aria-label="Scope editor"><h2>@(_editing ? "Edit scope" : "New scope")</h2>
-                <label>Name <input @bind="_editor.Name" disabled="@_editing" /></label>
-                <label>Display name <input @bind="_editor.DisplayName" /></label>
-                <label>Description <textarea @bind="_editor.Description"></textarea></label>
-                <label>Resources <input @bind="_resourcesText" /></label>
-                <button type="button" @onclick="Save">Save</button><button type="button" @onclick="Cancel">Cancel</button>
-                @if (!string.IsNullOrEmpty(_error)) { <p role="alert">@_error</p> }
-            </section>
-        }
+        <section class="admin-page">
+            <header class="page-header">
+                <div class="page-header__titles">
+                    <h1>Scopes</h1>
+                    <p class="page-subtitle">Define the scopes clients can request and the resources they release.</p>
+                </div>
+                <div class="page-header__actions">
+                    <button class="btn btn--ghost" type="button" @onclick="Refresh">Refresh</button>
+                    <button class="btn btn--primary" type="button" @onclick="BeginCreate">New scope</button>
+                </div>
+            </header>
+
+            <div class="toolbar">
+                <div class="toolbar__search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" />
+                        <path d="m21 21-4.3-4.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                    <input aria-label="Search scopes" @bind="_search" @bind:event="oninput" placeholder="Search scopes" />
+                </div>
+            </div>
+
+            @if (_model is null)
+            {
+                <p class="loading-note" role="status" aria-live="polite">Loading…</p>
+            }
+            else
+            {
+                <div class="admin-card admin-card--table">
+                    <table class="data-table" data-testid="scopes-table">
+                        <thead><tr><th>Name</th><th>Display name</th><th>Resources</th><th>Protected resources</th><th>Permissions</th><th class="data-table__actions-col"></th></tr></thead>
+                        <tbody>
+                            @foreach (var item in _model.Items)
+                            {
+                                <tr>
+                                    <td><code class="data-table__code">@item.Name</code></td>
+                                    <td><span class="data-table__primary">@item.DisplayName</span></td>
+                                    <td class="data-table__muted">@string.Join(", ", item.Resources)</td>
+                                    <td class="data-table__muted">@string.Join(", ", item.Clients)</td>
+                                    <td class="data-table__muted">@string.Join(", ", item.Permissions)</td>
+                                    <td class="data-table__actions">
+                                        <button class="btn btn--ghost btn--small" type="button" @onclick="() => BeginEdit(item)">Edit</button>
+                                        @if (!item.IsReserved)
+                                        {
+                                            <button class="btn btn--danger-ghost btn--small" type="button" @onclick="() => DeleteAsync(item)">Delete</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <p class="table-summary">Showing @_model.Items.Count of @_model.TotalCount</p>
+            }
+
+            @if (_editor is not null)
+            {
+                <section class="editor-card" aria-label="Scope editor">
+                    <h2 class="editor-card__title">@(_editing ? "Edit scope" : "New scope")</h2>
+                    <div class="field-grid">
+                        <label class="field"><span class="field__label">Name</span><input @bind="_editor.Name" disabled="@_editing" /></label>
+                        <label class="field"><span class="field__label">Display name</span><input @bind="_editor.DisplayName" /></label>
+                        <label class="field field--span"><span class="field__label">Description</span><textarea rows="3" @bind="_editor.Description"></textarea></label>
+                        <label class="field field--span"><span class="field__label">Resources</span><input @bind="_resourcesText" /></label>
+                    </div>
+                    <div class="editor-card__actions">
+                        <button class="btn btn--primary" type="button" @onclick="Save">Save</button>
+                        <button class="btn btn--ghost" type="button" @onclick="Cancel">Cancel</button>
+                    </div>
+                    @if (!string.IsNullOrEmpty(_error))
+                    {
+                        <div class="alert alert--error" role="alert">@_error</div>
+                    }
+                </section>
+            }
+        </section>
     </Authorized>
-    <NotAuthorized><p>Sign in to continue.</p></NotAuthorized>
+    <NotAuthorized><p class="loading-note">Sign in to continue.</p></NotAuthorized>
 </AuthorizeView>
 
 @code {

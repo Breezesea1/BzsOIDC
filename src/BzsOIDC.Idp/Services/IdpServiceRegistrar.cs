@@ -80,8 +80,11 @@ internal sealed class IdpServiceRegistrar(IServiceCollection sc, IConfiguration 
     /// <returns>执行结果。</returns>
     internal IServiceCollection AddOidc()
     {
+        sc.AddIdentityPrincipalServices();
         sc.AddScoped<IOidcConsentPageRenderer, OidcConsentPageRenderer>();
         sc.AddScoped<IOidcConsentLifecycle, OidcConsentLifecycle>();
+        sc.AddScoped<IOidcConsentPreviewService, OidcConsentPreviewService>();
+        sc.AddScoped<IOidcConnectService, OidcConnectService>();
         sc.AddSingleton<IOidcConsentRequestProtector, OidcConsentRequestProtector>();
         sc.AddScoped<OidcClientPermissionBackfillService>();
 

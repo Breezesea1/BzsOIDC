@@ -1213,6 +1213,7 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
         registrar.AddOidc();
 
         builder.Services.AddScoped<IUserService, UserService>();
+        builder.Services.AddIdentityPrincipalServices();
         builder.Services.AddScoped<IUserAdministration, UserAdministration>();
         builder.Services.AddScoped<RoleManagementPolicy>();
         builder.Services.AddScoped<IPermissionTopology, PermissionTopologyService>();

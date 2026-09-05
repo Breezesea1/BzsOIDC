@@ -303,8 +303,11 @@ public sealed class PermissionTopologyApiIntegrationTests : IAsyncLifetime
         builder.Services.AddIdentityCore<BzsUser>()
             .AddRoles<BzsRole>()
             .AddEntityFrameworkStores<IdpDbContext>()
-            .AddDefaultTokenProviders();
+            .AddDefaultTokenProviders()
+            .AddSignInManager();
+        builder.Services.AddScoped<IUserService, UserService>();
         builder.Services.AddScoped<RoleManagementPolicy>();
+        builder.Services.AddIdentityPrincipalServices();
         builder.Services.AddScoped<IPermissionTopology, PermissionTopologyService>();
         _scopeService = Substitute.For<IOidcScopeService>();
         builder.Services.AddSingleton(_scopeService);

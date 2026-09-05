@@ -6,91 +6,116 @@
 <PageTitle>OIDC clients</PageTitle>
 <AuthorizeView>
     <Authorized>
-        <section data-testid="clients-page">
-            <h1>OIDC client administration</h1>
-            <div class="clients-toolbar">
-                <label>Search clients <input aria-label="Search clients" @bind="_search" @bind:event="oninput" /></label>
-                <button type="button" @onclick="RefreshAsync">Search</button>
-                <button type="button" @onclick="ClearSearchAsync">Clear</button>
-                <button type="button" @onclick="BeginCreate">New OIDC client</button>
+        <section class="admin-page" data-testid="clients-page">
+            <header class="page-header">
+                <div class="page-header__titles">
+                    <h1>OIDC client administration</h1>
+                    <p class="page-subtitle">Register and maintain applications that authenticate through this provider.</p>
+                </div>
+                <button class="btn btn--primary" type="button" @onclick="BeginCreate">New OIDC client</button>
+            </header>
+
+            <div class="toolbar">
+                <div class="toolbar__search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" />
+                        <path d="m21 21-4.3-4.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                    <input aria-label="Search clients" @bind="_search" @bind:event="oninput" placeholder="Search clients" />
+                </div>
+                <button class="btn btn--secondary" type="button" @onclick="RefreshAsync">Search</button>
+                <button class="btn btn--ghost" type="button" @onclick="ClearSearchAsync">Clear</button>
             </div>
 
             @if (_error is not null)
             {
-                <p role="alert">@_error</p>
+                <div class="alert alert--error" role="alert">@_error</div>
             }
             @if (_model is null)
             {
-                <p role="status" aria-live="polite">Loading…</p>
+                <p class="loading-note" role="status" aria-live="polite">Loading…</p>
             }
             else
             {
-                <table data-testid="clients-table">
-                    <thead><tr><th>Client ID</th><th>Display name</th><th>Type</th><th>Actions</th></tr></thead>
-                    <tbody>
-                        @foreach (var client in _model.Items)
-                        {
-                            <tr>
-                                <td>@client.ClientId</td>
-                                <td>@client.DisplayName</td>
-                                <td>@(client.PublicClient ? "Public" : "Confidential")</td>
-                                <td>
-                                    <button type="button" @onclick="() => BeginEditAsync(client)">Edit</button>
-                                    <button type="button" @onclick="() => DeleteAsync(client)">Delete</button>
-                                    @if (!client.PublicClient)
-                                    {
-                                        <button type="button" @onclick="() => RotateSecretAsync(client)">Rotate secret</button>
-                                    }
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-                <p>Showing @_model.Items.Count of @_model.TotalCount clients.</p>
+                <div class="admin-card admin-card--table">
+                    <table class="data-table" data-testid="clients-table">
+                        <thead><tr><th>Client ID</th><th>Display name</th><th>Type</th><th class="data-table__actions-col">Actions</th></tr></thead>
+                        <tbody>
+                            @foreach (var client in _model.Items)
+                            {
+                                <tr>
+                                    <td><code class="data-table__code">@client.ClientId</code></td>
+                                    <td><span class="data-table__primary">@client.DisplayName</span></td>
+                                    <td><span class="badge @(client.PublicClient ? "badge--info" : "badge--primary")">@(client.PublicClient ? "Public" : "Confidential")</span></td>
+                                    <td class="data-table__actions">
+                                        <button class="btn btn--ghost btn--small" type="button" @onclick="() => BeginEditAsync(client)">Edit</button>
+                                        <button class="btn btn--danger-ghost btn--small" type="button" @onclick="() => DeleteAsync(client)">Delete</button>
+                                        @if (!client.PublicClient)
+                                        {
+                                            <button class="btn btn--ghost btn--small" type="button" @onclick="() => RotateSecretAsync(client)">Rotate secret</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <p class="table-summary">Showing @_model.Items.Count of @_model.TotalCount clients.</p>
             }
 
             @if (_editor is not null)
             {
-                <section aria-label="Client editor" data-testid="client-editor">
-                    <h2>@(_creating ? "New OIDC client" : "Edit client")</h2>
-                    <label>Client ID <input @bind="_editor.ClientId" disabled="@(!_creating)" /></label>
-                    <label>Display name <input @bind="_editor.DisplayName" /></label>
-                    <label>Client type
-                        <select @bind="_editor.PublicClient">
-                            <option value="true">Public</option>
-                            <option value="false">Confidential</option>
-                        </select>
-                    </label>
-                    <label>Authentication flow
-                        <select @bind="_editor.AuthFlow">
-                            <option value="@OidcClientAuthFlow.AuthorizationCode">Authorization code</option>
-                            <option value="@OidcClientAuthFlow.ClientCredentials">Client credentials</option>
-                        </select>
-                    </label>
-                    <label>Scopes <input @bind="_editor.ScopesText" /></label>
-                    <label>Redirect URIs <textarea @bind="_editor.RedirectUrisText"></textarea></label>
-                    <label>Post-logout redirect URIs <textarea @bind="_editor.PostLogoutRedirectUrisText"></textarea></label>
-                    <button type="button" @onclick="SaveAsync">@(_creating ? "Create" : "Save")</button>
-                    <button type="button" @onclick="CancelEdit">Cancel</button>
+                <section class="editor-card" aria-label="Client editor" data-testid="client-editor">
+                    <h2 class="editor-card__title">@(_creating ? "New OIDC client" : "Edit client")</h2>
+                    <div class="field-grid">
+                        <label class="field"><span class="field__label">Client ID</span><input @bind="_editor.ClientId" disabled="@(!_creating)" /></label>
+                        <label class="field"><span class="field__label">Display name</span><input @bind="_editor.DisplayName" /></label>
+                        <label class="field"><span class="field__label">Client type</span>
+                            <select @bind="_editor.PublicClientValue">
+                                <option value="true">Public</option>
+                                <option value="false">Confidential</option>
+                            </select>
+                        </label>
+                        <label class="field"><span class="field__label">Authentication flow</span>
+                            <select @bind="_editor.AuthFlow">
+                                <option value="@OidcClientAuthFlow.AuthorizationCode">Authorization code</option>
+                                <option value="@OidcClientAuthFlow.ClientCredentials">Client credentials</option>
+                            </select>
+                        </label>
+                        <label class="field field--span"><span class="field__label">Scopes</span><input @bind="_editor.ScopesText" /></label>
+                        <label class="field field--span"><span class="field__label">Redirect URIs</span><textarea rows="3" @bind="_editor.RedirectUrisText"></textarea></label>
+                        <label class="field field--span"><span class="field__label">Post-logout redirect URIs</span><textarea rows="3" @bind="_editor.PostLogoutRedirectUrisText"></textarea></label>
+                    </div>
+                    <div class="editor-card__actions">
+                        <button class="btn btn--primary" type="button" @onclick="SaveAsync">@(_creating ? "Create" : "Save")</button>
+                        <button class="btn btn--ghost" type="button" @onclick="CancelEdit">Cancel</button>
+                    </div>
                     @if (_conflict)
                     {
-                        <p role="alert">This client changed elsewhere. Reload to continue; your edits are preserved.</p>
+                        <div class="alert alert--warning" role="alert">This client changed elsewhere. Reload to continue; your edits are preserved.</div>
                     }
                 </section>
             }
 
             @if (_generatedSecret is not null)
             {
-                <section aria-label="Generated client secret" data-testid="generated-secret">
-                    <h2>Client secret generated</h2>
-                    <p>Copy this secret now. It will not be shown again.</p>
-                    <output>@_generatedSecret</output>
-                    <button type="button" @onclick="DismissSecret">Dismiss</button>
+                <section class="secret-callout" aria-label="Generated client secret" data-testid="generated-secret">
+                    <div class="secret-callout__icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </div>
+                    <div class="secret-callout__body">
+                        <h2>Client secret generated</h2>
+                        <p>Copy this secret now. It will not be shown again.</p>
+                        <output>@_generatedSecret</output>
+                    </div>
+                    <button class="btn btn--ghost" type="button" @onclick="DismissSecret">Dismiss</button>
                 </section>
             }
         </section>
     </Authorized>
-    <NotAuthorized><p>Sign in to continue.</p></NotAuthorized>
+    <NotAuthorized><p class="loading-note">Sign in to continue.</p></NotAuthorized>
 </AuthorizeView>
 
 @code {
@@ -278,6 +303,11 @@
         public string ETag { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
         public bool PublicClient { get; set; }
+        public string PublicClientValue
+        {
+            get => PublicClient ? "true" : "false";
+            set => PublicClient = bool.TryParse(value, out var result) && result;
+        }
         public OidcClientAuthFlow AuthFlow { get; set; }
         public string ScopesText { get; set; } = string.Empty;
         public string RedirectUrisText { get; set; } = string.Empty;
@@ -301,7 +331,10 @@
             DisplayName = DisplayName.Trim(),
             PublicClient = PublicClient,
             AuthFlow = AuthFlow,
-            ConsentType = OidcClientConsentType.Explicit,
+            RequireProofKeyForCodeExchange = AuthFlow == OidcClientAuthFlow.AuthorizationCode,
+            ConsentType = AuthFlow == OidcClientAuthFlow.ClientCredentials
+                ? OidcClientConsentType.External
+                : OidcClientConsentType.Explicit,
             GrantTypes = AuthFlow == OidcClientAuthFlow.ClientCredentials ? ["client_credentials"] : ["authorization_code", "refresh_token"],
             Scopes = Split(ScopesText, ',') ,
             RedirectUris = Split(RedirectUrisText, '\n'),

@@ -199,7 +199,7 @@ else if (_summary is not null)
                                 <span>72%</span>
                             </div>
                             <div class="dashboard-goal-bar">
-                                <div class="dashboard-goal-fill" style="width: 72%; background: #2563eb;"></div>
+                                <div class="dashboard-goal-fill dashboard-goal-fill-primary"></div>
                             </div>
                         </div>
                         <div class="dashboard-goal-item">
@@ -208,7 +208,7 @@ else if (_summary is not null)
                                 <span>45%</span>
                             </div>
                             <div class="dashboard-goal-bar">
-                                <div class="dashboard-goal-fill" style="width: 45%; background: #0f766e;"></div>
+                                <div class="dashboard-goal-fill dashboard-goal-fill-success"></div>
                             </div>
                         </div>
                         <div class="dashboard-goal-item">
@@ -217,7 +217,7 @@ else if (_summary is not null)
                                 <span>88%</span>
                             </div>
                             <div class="dashboard-goal-bar">
-                                <div class="dashboard-goal-fill" style="width: 88%; background: #ca8a04;"></div>
+                                <div class="dashboard-goal-fill dashboard-goal-fill-warning"></div>
                             </div>
                         </div>
                     </div>
@@ -234,14 +234,14 @@ else if (_summary is not null)
 
                 <div class="dashboard-activity-list">
                     <div class="dashboard-activity-item">
-                        <div class="dashboard-activity-dot" style="background: #2563eb;"></div>
+                        <div class="dashboard-activity-dot dashboard-activity-dot-primary"></div>
                         <div class="dashboard-activity-content">
                             <strong>@(L["ActivityUserAdded"].ResourceNotFound ? "New admin user registered" : L["ActivityUserAdded"])</strong>
                             <span>@(L["TimeJustNow"].ResourceNotFound ? "Just now" : L["TimeJustNow"])</span>
                         </div>
                     </div>
                     <div class="dashboard-activity-item">
-                        <div class="dashboard-activity-dot" style="background: #0f766e;"></div>
+                        <div class="dashboard-activity-dot dashboard-activity-dot-success"></div>
                         <div class="dashboard-activity-content">
                             <strong>@(L["ActivityClientUpdated"].ResourceNotFound ? "Payment portal client updated" : L["ActivityClientUpdated"])</strong>
                             <span>@(L["TimeTwoHoursAgo"].ResourceNotFound ? "2 hours ago" : L["TimeTwoHoursAgo"])</span>
@@ -251,14 +251,14 @@ else if (_summary is not null)
                     <details class="dashboard-activity-disclosure">
                         <summary>@(L["MoreActivity"].ResourceNotFound ? "View more activity" : L["MoreActivity"])</summary>
                         <div class="dashboard-activity-item dashboard-activity-item-disclosed">
-                            <div class="dashboard-activity-dot" style="background: #ca8a04;"></div>
+                            <div class="dashboard-activity-dot dashboard-activity-dot-warning"></div>
                             <div class="dashboard-activity-content">
                                 <strong>@(L["ActivityScopeAdded"].ResourceNotFound ? "New billing scope created" : L["ActivityScopeAdded"])</strong>
                                 <span>@(L["TimeYesterday"].ResourceNotFound ? "Yesterday" : L["TimeYesterday"])</span>
                             </div>
                         </div>
                         <div class="dashboard-activity-item dashboard-activity-item-disclosed">
-                            <div class="dashboard-activity-dot" style="background: #64748b;"></div>
+                            <div class="dashboard-activity-dot dashboard-activity-dot-muted"></div>
                             <div class="dashboard-activity-content">
                                 <strong>@(L["ActivitySystemBackup"].ResourceNotFound ? "System configuration backup completed" : L["ActivitySystemBackup"])</strong>
                                 <span>@(L["TimeTwoDaysAgo"].ResourceNotFound ? "2 days ago" : L["TimeTwoDaysAgo"])</span>
@@ -498,7 +498,7 @@ else if (_summary is not null)
                 Toolbar = new Toolbar { Show = false },
                 Background = "transparent"
             },
-            Colors = ["#0f766e", "#1d4ed8", "#ca8a04"],
+            Colors = ["#2f8067", "#315ea8", "#a9681b"],
             DataLabels = new DataLabels { Enabled = false },
             Grid = new Grid
             {
@@ -528,7 +528,7 @@ else if (_summary is not null)
                 Background = "transparent"
             },
             Labels = [L["Admins"], L["StandardUsers"]],
-            Colors = ["#2563eb", "#94a3b8"],
+            Colors = ["#315ea8", "#9eabbc"],
             Legend = new Legend
             {
                 Position = LegendPosition.Bottom

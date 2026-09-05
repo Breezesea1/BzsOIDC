@@ -1,5 +1,5 @@
-﻿@page "/Error"
-@layout WasmLayout
+@page "/Error"
+@layout AuthLayout
 @using System.Diagnostics
 @using Microsoft.AspNetCore.Components
 @using Microsoft.Extensions.Localization
@@ -7,70 +7,42 @@
 
 <PageTitle>@L["PageTitle"]</PageTitle>
 
-<section class="error-shell">
-    <div class="error-card">
-        <div class="error-copy">
-            <div class="error-copy-surface">
-                <div class="error-copy-header">
-                    <span class="error-kicker">@L["StatusKicker"]</span>
-
-                    <div class="error-brand" aria-label="OIDC">
-                        <span class="error-brand-mark" aria-hidden="true">
-                            <img src="/oidc-brand.jpg" alt="" width="44" height="44" />
-                        </span>
-                        <span class="error-brand-text">OIDC</span>
-                    </div>
-                </div>
-
-                <div class="error-copy-main">
-                    <div class="error-code-inline" aria-hidden="true">500</div>
-                    <h1>@L["Heading"]</h1>
-                    <p class="error-lead">@L["Subheading"]</p>
-                </div>
-
-                <div class="error-actions-panel">
-                    <a class="error-primary-link" href="/login" data-enhance-nav="false">
-                        <span>@L["ErrorPrimaryAction"]</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                            <path d="m12 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </a>
-
-                    <a class="error-secondary-link" href="/">@L["ErrorSecondaryAction"]</a>
-                </div>
-            </div>
+<section class="auth-card status-card" aria-labelledby="error-heading">
+    <div class="status-card__main">
+        <span class="status-card__kicker">@L["StatusKicker"]</span>
+        <div class="status-card__code" aria-hidden="true">500</div>
+        <h1 id="error-heading">@L["Heading"]</h1>
+        <p class="auth-card__lead">@L["Subheading"]</p>
+        <div class="auth-action-row">
+            <a class="auth-submit auth-submit--link" href="/login" data-enhance-nav="false">
+                <span>@L["ErrorPrimaryAction"]</span>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    <path d="m12 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </a>
+            <a class="auth-secondary" href="/">@L["ErrorSecondaryAction"]</a>
         </div>
-
-        <aside class="error-aside" aria-label="@L["TechnicalDetailsAria"]">
-            <div class="error-code-panel" aria-hidden="true">
-                <div class="error-code">
-                    <span>5</span>
-                    <span>0</span>
-                    <span>0</span>
-                </div>
-            </div>
-
-            <div class="error-panel">
-                <p class="error-panel-label">@L["TechnicalDetailsHeading"]</p>
-                <p class="error-panel-copy">@L["TechnicalDetailsLead"]</p>
-
-                @if (ShowRequestId)
-                {
-                    <div class="error-request-id">
-                        <span class="error-request-id__label">@L["RequestIdLabel"]</span>
-                        <code>@RequestId</code>
-                    </div>
-                }
-
-                <div class="error-tip">
-                    <strong>@L["DevelopmentModeHeading"]</strong>
-                    <span>@DevelopmentModeIntroMarkup</span>
-                    <span>@L["DevelopmentModeWarning"] @DevelopmentModeDetailsMarkup</span>
-                </div>
-            </div>
-        </aside>
     </div>
+
+    <aside class="status-card__aside" aria-label="@L["TechnicalDetailsAria"]">
+        <p class="status-card__aside-label">@L["TechnicalDetailsHeading"]</p>
+        <p class="status-card__aside-copy">@L["TechnicalDetailsLead"]</p>
+
+        @if (ShowRequestId)
+        {
+            <div class="status-card__request-id">
+                <span class="status-card__request-label">@L["RequestIdLabel"]</span>
+                <code>@RequestId</code>
+            </div>
+        }
+
+        <p class="status-card__tip">
+            <strong>@L["DevelopmentModeHeading"]</strong>
+            <span>@DevelopmentModeIntroMarkup</span>
+            <span>@L["DevelopmentModeWarning"] @DevelopmentModeDetailsMarkup</span>
+        </p>
+    </aside>
 </section>
 
 @code {

@@ -104,8 +104,10 @@ public sealed class UsersApiIntegrationTests : IAsyncLifetime
         builder.Services.AddMemoryCache();
         builder.Services.Configure<PermissionPolicyOptions>(_ => { }); builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>(); builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
         builder.Services.AddDbContext<IdpDbContext>(o => o.UseSqlite(_connection));
-        builder.Services.AddIdentityCore<BzsUser>().AddRoles<BzsRole>().AddEntityFrameworkStores<IdpDbContext>().AddDefaultTokenProviders();
+        builder.Services.AddIdentityCore<BzsUser>().AddRoles<BzsRole>().AddEntityFrameworkStores<IdpDbContext>().AddDefaultTokenProviders().AddSignInManager();
+        builder.Services.AddScoped<IUserService, UserService>();
         builder.Services.AddScoped<RoleManagementPolicy>();
+        builder.Services.AddIdentityPrincipalServices();
         builder.Services.AddScoped<IPermissionTopology, PermissionTopologyService>();
         builder.Services.AddScoped<IUserAdministration, UserAdministration>();
         builder.Services.AddControllersWithViews().AddApplicationPart(typeof(UsersController).Assembly);
