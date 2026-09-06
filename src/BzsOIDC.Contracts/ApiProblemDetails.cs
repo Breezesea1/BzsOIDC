@@ -30,30 +30,3 @@ public class ApiProblemDetails
         Errors = errors;
     }
 }
-
-public static class ApiProblemDetailsExtensions
-{
-    public const string CodePropertyName = "code";
-    public const string TraceIdPropertyName = "traceId";
-    public const string ErrorsPropertyName = "errors";
-}
-
-/// <summary>Short transport name retained for clients that model RFC problem details directly.</summary>
-public sealed class ProblemDetails : ApiProblemDetails
-{
-    public ProblemDetails()
-    {
-    }
-
-    public ProblemDetails(int status, string code, string traceId, IReadOnlyDictionary<string, string[]>? errors = null)
-        : base(status, code, traceId, errors)
-    {
-    }
-}
-
-public static class ProblemDetailsExtensions
-{
-    public const string CodePropertyName = ApiProblemDetailsExtensions.CodePropertyName;
-    public const string TraceIdPropertyName = ApiProblemDetailsExtensions.TraceIdPropertyName;
-    public const string ErrorsPropertyName = ApiProblemDetailsExtensions.ErrorsPropertyName;
-}

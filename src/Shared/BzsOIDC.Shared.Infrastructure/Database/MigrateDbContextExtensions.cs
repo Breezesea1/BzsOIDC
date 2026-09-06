@@ -29,21 +29,6 @@ public static class MigrateDbContextExtensions
                     ? new MigrationService<TContext>(sp)
                     : new MigrationService<TContext>(sp, seeder));
         }
-
-        /// <summary>
-        /// Adds migration services to the service collection.
-        /// </summary>
-        public IServiceCollection AddMigration<TContext>(string key,
-            Func<TContext, IServiceProvider, Task>? seeder = null)
-            where TContext : DbContext
-        {
-            // Enable migration tracing
-            sc.AddOpenTelemetry().WithTracing(tracing => tracing.AddSource(_activitySourceName));
-            return sc.AddKeyedScoped<IMigrated>(key, (sp, _) =>
-                seeder is null
-                    ? new MigrationService<TContext>(sp)
-                    : new MigrationService<TContext>(sp, seeder));
-        }
     }
 
 

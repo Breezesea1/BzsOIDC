@@ -54,11 +54,6 @@ public sealed class PermissionClaimsPrincipalFactoryTests
     {
         public int GetRolesCallCount { get; private set; }
 
-        public override Task<string> GetUserIdAsync(BzsUser user)
-        {
-            return Task.FromResult(user.Id.ToString());
-        }
-
         public override Task<string?> GetUserNameAsync(BzsUser user)
         {
             return Task.FromResult(user.UserName);

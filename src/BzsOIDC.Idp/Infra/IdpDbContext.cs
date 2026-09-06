@@ -9,7 +9,6 @@ public sealed class IdpDbContext(DbContextOptions<IdpDbContext> options)
 {
     public DbSet<ProtectedResource> ProtectedResources => Set<ProtectedResource>();
     public DbSet<PermissionDefinition> PermissionDefinitions => Set<PermissionDefinition>();
-    public DbSet<PermissionReleaseScope> PermissionReleaseScopes => Set<PermissionReleaseScope>();
 
     /// <summary>
     /// 配置实体模型并应用程序集中的实体配置。

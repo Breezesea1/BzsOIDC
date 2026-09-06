@@ -1062,7 +1062,6 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
 
         builder.Services.AddMemoryCache();
         builder.Services.AddHttpContextAccessor();
-        builder.Services.AddLocalization(options => { options.ResourcesPath = "Resources"; });
         builder.Services.AddForwardedHeaders();
         builder.Services.AddExternalAuthenticationServices(builder.Configuration);
         builder.Services.AddDbContext<IdpDbContext>(
@@ -1284,14 +1283,6 @@ public sealed class ConnectControllerIntegrationTests : IAsyncLifetime
 
         var updateResult = await userManager.UpdateAsync(admin);
         Assert.True(updateResult.Succeeded, string.Join(", ", updateResult.Errors.Select(static error => error.Description)));
-    }
-
-    private async Task<string?> GetAdminUserIdAsync()
-    {
-        await using var scope = _app.Services.CreateAsyncScope();
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<BzsUser>>();
-        var admin = await userManager.FindByNameAsync("admin");
-        return admin is null ? null : await userManager.GetUserIdAsync(admin);
     }
 
     private async Task EnsureExplicitConsentClientAsync(string clientId, string redirectUri)

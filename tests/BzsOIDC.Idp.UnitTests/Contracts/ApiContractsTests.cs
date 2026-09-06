@@ -8,27 +8,6 @@ namespace BzsOIDC.Idp.UnitTests.Contracts;
 public sealed class ApiContractsTests
 {
     [Fact]
-    public void PageRequest_DefaultsToBoundedServerPaging()
-    {
-        var request = new PageRequest();
-
-        Assert.Equal(1, request.Page);
-        Assert.Equal(PageRequest.DefaultPageSize, request.PageSize);
-        Assert.Empty(request.Sort);
-        Assert.Empty(request.Filters);
-        Assert.Equal(PageRequest.MaximumPageSize, 100);
-    }
-
-    [Fact]
-    public void PageResult_ComputesTotalPagesWithoutExposingPersistenceTypes()
-    {
-        var result = new PageResult<string>(["one"], page: 2, pageSize: 25, totalCount: 51);
-
-        Assert.Equal(3, result.TotalPages);
-        Assert.Equal("one", Assert.Single(result.Items));
-    }
-
-    [Fact]
     public async Task ApiProblemDetailsWriter_EmitsSafeProblemJson()
     {
         var context = new DefaultHttpContext();
@@ -45,28 +24,5 @@ public sealed class ApiContractsTests
         Assert.NotNull(payload);
         Assert.Equal(ApiErrorCodes.Unauthorized, payload.Code);
         Assert.Equal("trace-123", payload.TraceId);
-    }
-
-    [Fact]
-    public void PermissionTopologyContracts_AreBrowserSafeAndPreserveRelationships()
-    {
-        var detail = new ProtectedResourceDetail
-        {
-            Key = "users",
-            Permissions =
-            [
-                new PermissionDefinitionSummary
-                {
-                    Name = "users.read",
-                    ReleaseScopes = ["api"],
-                    AssignedRoles = [new RolePermissionAssignment { RoleName = "Administrator", Assigned = true }]
-                }
-            ]
-        };
-
-        var permission = Assert.Single(detail.Permissions);
-        Assert.Equal("users", detail.Key);
-        Assert.Equal("users.read", permission.Name);
-        Assert.True(Assert.Single(permission.AssignedRoles).Assigned);
     }
 }

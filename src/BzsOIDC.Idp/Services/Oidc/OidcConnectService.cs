@@ -26,8 +26,6 @@ public interface IOidcConnectService
         IPermissionTopology permissionTopology,
         CancellationToken cancellationToken = default);
 
-    Task<string> ResolveClientDisplayNameAsync(string? clientId, CancellationToken cancellationToken = default);
-
     Task<OidcUserInfo?> GetUserInfoAsync(ClaimsPrincipal tokenPrincipal, CancellationToken cancellationToken = default);
 }
 
@@ -114,24 +112,6 @@ internal sealed class OidcConnectService(
         principal.SetScopes(oidcPrincipalFactory.FilterRequestedScopes(scopes));
         await PermissionClaimDestinationsHandler.ApplyDestinationsAsync(principal, permissionTopology, cancellationToken);
         return principal;
-    }
-
-    public async Task<string> ResolveClientDisplayNameAsync(string? clientId, CancellationToken cancellationToken = default)
-    {
-        if (!string.IsNullOrWhiteSpace(clientId))
-        {
-            var application = await applicationManager.FindByClientIdAsync(clientId, cancellationToken);
-            if (application is not null)
-            {
-                var displayName = await applicationManager.GetDisplayNameAsync(application, cancellationToken);
-                if (!string.IsNullOrWhiteSpace(displayName))
-                {
-                    return displayName;
-                }
-            }
-        }
-
-        return clientId ?? "the client";
     }
 
     public async Task<OidcUserInfo?> GetUserInfoAsync(ClaimsPrincipal tokenPrincipal, CancellationToken cancellationToken = default)

@@ -2,11 +2,9 @@ using BzsOIDC.Idp.Infra;
 using BzsOIDC.Idp.Infra.Http;
 using BzsOIDC.Idp.Services;
 using BzsOIDC.Idp.Services.Identity;
-using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.RateLimiting;
-using System.Globalization;
 using BzsOIDC.Contracts;
 using BzsOIDC.Shared.Infrastructure.Http;
 
@@ -16,22 +14,6 @@ builder.Services.AddOpenApi();
 builder.Services.AddIdpService(builder.Configuration, builder.Environment);
 builder.Services.AddIdpAuthorization();
 builder.EnrichFromAspire();
-builder.Services.AddLocalization(options => { options.ResourcesPath = "Resources"; });
-builder.Services.Configure<RequestLocalizationOptions>(options =>
-{
-    var supportedCultures = new[] { "zh-CN", "en-US" }
-        .Select(static name => new CultureInfo(name))
-        .ToArray();
-
-    options.DefaultRequestCulture = new RequestCulture("zh-CN");
-    options.SupportedCultures = supportedCultures;
-    options.SupportedUICultures = supportedCultures;
-    options.RequestCultureProviders =
-    [
-        new CookieRequestCultureProvider(),
-        new AcceptLanguageHeaderRequestCultureProvider(),
-    ];
-});
 
 // Add services to the container.
 builder.Services.AddControllersWithViews(options => options.Filters.Add<ApiProblemDetailsResultFilter>())
@@ -156,7 +138,6 @@ app.UseWhen(
     }));
 app.UseForwardedHeaders();
 app.UseHttpsRedirection();
-app.UseRequestLocalization();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
