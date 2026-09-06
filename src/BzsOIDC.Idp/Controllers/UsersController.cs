@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using BzsOIDC.Contracts;
+using BzsOIDC.Idp.Services;
 using BzsOIDC.Idp.Services.Identity;
 using BzsOIDC.Shared.Infrastructure.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -20,8 +21,7 @@ public sealed class UsersController(IUserAdministration users, ILogger<UsersCont
         [FromQuery] int pageSize = 25,
         CancellationToken cancellationToken = default)
     {
-        page = Math.Max(1, page);
-        pageSize = Math.Clamp(pageSize, 1, 100);
+        (page, pageSize) = Paging.Normalize(page, pageSize);
         var all = await users.GetUsersAsync(cancellationToken);
         IEnumerable<UserAdministrationUser> query = all;
         if (!string.IsNullOrWhiteSpace(search))

@@ -75,15 +75,6 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
     {
-        if (ApiProblemDetailsWriter.IsApiRequest(context.Request))
-        {
-            await ApiProblemDetailsWriter.WriteAsync(
-                context,
-                StatusCodes.Status500InternalServerError,
-                ApiErrorCodes.Unexpected);
-            return;
-        }
-
         await ApiProblemDetailsWriter.WriteAsync(
             context,
             StatusCodes.Status500InternalServerError,

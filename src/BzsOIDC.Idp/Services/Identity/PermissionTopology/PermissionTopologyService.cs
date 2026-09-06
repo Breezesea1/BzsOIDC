@@ -123,8 +123,7 @@ internal sealed class PermissionTopologyService(
 
     public async Task<RoleListResponse> ListRolesAsync(RoleListQuery query, CancellationToken cancellationToken = default)
     {
-        var page = Math.Max(1, query.Page);
-        var pageSize = Math.Clamp(query.PageSize <= 0 ? 25 : query.PageSize, 1, 100);
+        var (page, pageSize) = Paging.Normalize(query.Page, query.PageSize);
         var roles = await GetAllRolesAsync(cancellationToken);
         IEnumerable<RoleResponse> filtered = roles;
         if (!string.IsNullOrWhiteSpace(query.Search))

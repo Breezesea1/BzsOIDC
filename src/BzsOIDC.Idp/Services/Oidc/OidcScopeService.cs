@@ -83,8 +83,7 @@ internal sealed class OidcScopeService(IOpenIddictScopeManager scopeManager, IOi
 
     public async Task<OidcScopeListResponse> ListAsync(OidcScopeListQuery query, CancellationToken cancellationToken = default)
     {
-        var page = Math.Max(1, query.Page);
-        var pageSize = Math.Clamp(query.PageSize <= 0 ? 25 : query.PageSize, 1, 100);
+        var (page, pageSize) = Paging.Normalize(query.Page, query.PageSize);
         var all = (await GetAllAsync(cancellationToken)).AsEnumerable();
         if (!string.IsNullOrWhiteSpace(query.Search))
         {

@@ -178,8 +178,7 @@ internal sealed class OidcClientService(
         all = string.Equals(query.Sort, "displayName", StringComparison.OrdinalIgnoreCase)
             ? (descending ? all.OrderByDescending(x => x.DisplayName).ThenBy(x => x.ClientId) : all.OrderBy(x => x.DisplayName).ThenBy(x => x.ClientId)).ToArray()
             : (descending ? all.OrderByDescending(x => x.ClientId) : all.OrderBy(x => x.ClientId)).ToArray();
-        var page = Math.Max(1, query.Page);
-        var pageSize = Math.Clamp(query.PageSize, 1, 100);
+        var (page, pageSize) = Paging.Normalize(query.Page, query.PageSize);
         return new OidcClientListResponse { Items = all.Skip((page - 1) * pageSize).Take(pageSize).ToArray(), TotalCount = all.Count, Page = page, PageSize = pageSize };
     }
 
