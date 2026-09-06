@@ -1,3 +1,4 @@
+using BzsOIDC.AppHost.ServiceDefaults;
 using BzsOIDC.Idp.Infra;
 using BzsOIDC.Idp.Infra.Http;
 using BzsOIDC.Idp.Services;
@@ -9,6 +10,8 @@ using BzsOIDC.Contracts;
 using BzsOIDC.Shared.Infrastructure.Http;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.AddServiceDefaults();
 
 builder.Services.AddOpenApi();
 builder.Services.AddIdpService(builder.Configuration, builder.Environment);
@@ -55,6 +58,8 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
+
+app.MapDefaultEndpoints();
 
 // Apply the backend security headers before any API or protocol response.
 app.UseStaticAssetHardening();
