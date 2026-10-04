@@ -6,7 +6,10 @@ BASE_URL="${1:?usage: check-health.sh <base-url> [timeout-seconds]}"
 TIMEOUT="${2:-10}"
 BASE_URL="${BASE_URL%/}"
 
-for endpoint in /login /.well-known/openid-configuration; do
+# The backend-only Idp exposes no GET login page (only POST /api/account/login).
+# The OIDC discovery document is the only reliable GET liveness probe available
+# in every environment; /health and /alive are mapped only in Development.
+for endpoint in /.well-known/openid-configuration; do
     url="${BASE_URL}${endpoint}"
     response_file="$(mktemp)"
     status="$(curl --silent --show-error --output "${response_file}" --write-out '%{http_code}' --max-time "${TIMEOUT}" "${url}" || true)"
